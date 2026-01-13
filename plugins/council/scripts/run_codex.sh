@@ -2,7 +2,7 @@
 # Run Codex non-interactively and capture output
 # Usage: run_codex.sh "prompt" [working_dir]
 #
-# Security: Prompt is passed via stdin to avoid leaking to process listings
+# Note: Prompt is passed as argument (visible in process listings) then piped to codex
 # Timeouts: Check-in at 5 minutes, hard timeout at 10 minutes
 
 set -euo pipefail
@@ -43,7 +43,7 @@ cleanup() {
 trap cleanup EXIT
 
 # Run codex in background
-echo "$PROMPT" | codex exec --full-auto --skip-git-repo-check -C "$WORK_DIR" -o "$OUTPUT_FILE" - 2>&1 &
+printf '%s\n' "$PROMPT" | codex exec --full-auto --skip-git-repo-check -C "$WORK_DIR" -o "$OUTPUT_FILE" - 2>&1 &
 CODEX_PID=$!
 echo "$CODEX_PID" > "$PID_FILE"
 
@@ -63,6 +63,8 @@ while kill -0 "$CODEX_PID" 2>/dev/null; do
     # Hard timeout at 10 minutes
     if [[ "$ELAPSED" -ge "$HARD_TIMEOUT" ]]; then
         echo "[Council] Hard timeout reached (10 min). Terminating Codex." >&2
+        # Kill child processes first, then parent
+        pkill -P "$CODEX_PID" 2>/dev/null || true
         kill "$CODEX_PID" 2>/dev/null || true
         # Output any partial results
         if [[ -s "$OUTPUT_FILE" ]]; then
@@ -75,9 +77,11 @@ while kill -0 "$CODEX_PID" 2>/dev/null; do
     sleep 2
 done
 
-# Check exit status
+# Check exit status (disable -e to capture exit code without exiting)
+set +e
 wait "$CODEX_PID"
 EXIT_CODE=$?
+set -e
 
 if [[ "$EXIT_CODE" -ne 0 ]]; then
     echo "[Council] Codex exited with code $EXIT_CODE" >&2

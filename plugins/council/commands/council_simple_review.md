@@ -26,10 +26,11 @@ If reviewing multiple files, list them and confirm scope before proceeding.
 
 ### Step 2: Send to Codex for Review
 
-Use the helper script for consistent timeout handling and error management:
+Use the helper script for consistent timeout handling and error management. Use a heredoc for safe code embedding:
 
 ```bash
-${CLAUDE_PLUGIN_ROOT}/scripts/run_codex.sh "Review this code. Focus on:
+REVIEW_PROMPT=$(cat <<'PROMPT_END'
+Review this code. Focus on:
 - Bugs and logic errors
 - Security vulnerabilities
 - Performance issues
@@ -41,7 +42,10 @@ Be specific with line references. Here's the code:
 FILE: [filename]
 [code content]
 
-Provide a structured review with severity levels (critical/warning/suggestion)." "WORKING_DIR"
+Provide a structured review with severity levels (critical/warning/suggestion).
+PROMPT_END
+)
+${CLAUDE_PLUGIN_ROOT}/scripts/run_codex.sh "$REVIEW_PROMPT" "WORKING_DIR"
 ```
 
 ### Step 3: Present Codex's Review

@@ -16,7 +16,11 @@ The user's coding task/prompt follows the skill invocation.
 
 Extract the coding task from the user's prompt. If no task provided, ask what they want the council to work on.
 
-### Step 2: Run Codex
+### Step 2: Complexity Check
+
+For trivial tasks (single function, <20 lines, no algorithmic complexity), skip the council and just solve directly. Inform user: "Task is straightforward, skipping council."
+
+### Step 3: Run Codex
 
 Execute Codex on the task using the helper script:
 
@@ -28,11 +32,11 @@ Where:
 - `TASK_PROMPT` is the user's coding request
 - `WORKING_DIR` is the current working directory
 
-### Step 3: Generate Claude's Solution
+### Step 4: Generate Claude's Solution
 
 While waiting for Codex, generate your own solution to the same task. Think through the problem independently without being influenced by Codex's approach.
 
-### Step 4: Compare Solutions (Confidence Voting)
+### Step 5: Compare Solutions (Confidence Voting)
 
 Analyze both solutions for agreement. Check:
 
@@ -45,7 +49,7 @@ Agreement levels:
 - **PARTIAL_AGREE**: Same approach, minor differences (review for improvements)
 - **DISAGREE**: Fundamentally different approaches (full synthesis)
 
-### Step 5: Output Based on Agreement (Balanced Strategy)
+### Step 6: Output Based on Agreement (Balanced Strategy)
 
 **If STRONG_AGREE:**
 ```
@@ -102,14 +106,12 @@ Models took fundamentally different approaches. Analyzing strengths...
 
 ## Token Efficiency Rules
 
-1. **Complexity check**: For trivial tasks (single function, <20 lines, no algorithmic complexity), skip the council and just solve directly. Inform user: "Task is straightforward, skipping council."
-
-2. **Context compression**: When sending to Codex, include only:
+1. **Context compression**: When sending to Codex, include only:
    - The specific task
    - Relevant file contents (not entire codebase)
    - Key constraints
 
-3. **Early termination**: If both solutions are identical, don't analyze further.
+2. **Early termination**: If both solutions are identical, don't analyze further.
 
 ## Example Usage
 

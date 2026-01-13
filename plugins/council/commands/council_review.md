@@ -24,15 +24,19 @@ Generate the initial solution using Claude. This becomes the artifact under revi
 
 ### Step 3: Cross-Review with Codex
 
-Send the code to Codex for review:
+Send the code to Codex for review. Use a heredoc for safe code embedding:
 
 ```bash
-${CLAUDE_PLUGIN_ROOT}/scripts/run_codex.sh "Review this code for bugs, edge cases, performance issues, and improvements. Be specific and critical:
+REVIEW_PROMPT=$(cat <<'PROMPT_END'
+Review this code for bugs, edge cases, performance issues, and improvements. Be specific and critical:
 
 CODE:
 [insert code here]
 
-Provide specific line-by-line feedback." "WORKING_DIR"
+Provide specific line-by-line feedback.
+PROMPT_END
+)
+${CLAUDE_PLUGIN_ROOT}/scripts/run_codex.sh "$REVIEW_PROMPT" "WORKING_DIR"
 ```
 
 ### Step 4: Analyze Review Feedback
@@ -81,6 +85,8 @@ Maximum 2 debate rounds to prevent infinite loops.
 
 ### Final Improved Code
 [code with all agreed fixes applied]
+
+**Note:** If the user only requested a review (not fixes), ask before applying changes.
 
 ### Unresolved (Human Decision Needed)
 [any points where models couldn't agree after 2 rounds]
