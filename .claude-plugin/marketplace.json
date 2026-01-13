@@ -10,7 +10,7 @@
     {
       "name": "council",
       "description": "Council of LLMs - orchestrate multiple AI models for higher quality code generation",
-      "source": "./plugins/council",
+      "source": "../plugins/council",
       "category": "development"
     }
   ]
