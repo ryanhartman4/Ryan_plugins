@@ -26,10 +26,10 @@ If reviewing multiple files, list them and confirm scope before proceeding.
 
 ### Step 2: Send to Codex for Review
 
-Use the Codex review command directly for cleaner output:
+Use the helper script for consistent timeout handling and error management:
 
 ```bash
-codex exec "Review this code. Focus on:
+${CLAUDE_PLUGIN_ROOT}/scripts/run_codex.sh "Review this code. Focus on:
 - Bugs and logic errors
 - Security vulnerabilities
 - Performance issues
@@ -39,16 +39,9 @@ codex exec "Review this code. Focus on:
 Be specific with line references. Here's the code:
 
 FILE: [filename]
-```
 [code content]
-```
 
 Provide a structured review with severity levels (critical/warning/suggestion)." "WORKING_DIR"
-```
-
-Or for file-based review, use Codex's built-in review:
-```bash
-codex review [file_path]
 ```
 
 ### Step 3: Present Codex's Review

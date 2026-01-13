@@ -21,7 +21,7 @@ Extract the coding task from the user's prompt. If no task provided, ask what th
 Execute Codex on the task using the helper script:
 
 ```bash
-~/.claude/plugins/council/scripts/run_codex.sh "TASK_PROMPT" "WORKING_DIR"
+${CLAUDE_PLUGIN_ROOT}/scripts/run_codex.sh "TASK_PROMPT" "WORKING_DIR"
 ```
 
 Where:

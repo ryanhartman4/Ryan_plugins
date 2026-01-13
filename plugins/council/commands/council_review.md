@@ -27,7 +27,7 @@ Generate the initial solution using Claude. This becomes the artifact under revi
 Send the code to Codex for review:
 
 ```bash
-~/.claude/plugins/council/scripts/run_codex.sh "Review this code for bugs, edge cases, performance issues, and improvements. Be specific and critical:
+${CLAUDE_PLUGIN_ROOT}/scripts/run_codex.sh "Review this code for bugs, edge cases, performance issues, and improvements. Be specific and critical:
 
 CODE:
 [insert code here]
