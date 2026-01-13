@@ -10,8 +10,13 @@
     {
       "name": "council",
       "description": "Council of LLMs - orchestrate multiple AI models for higher quality code generation",
-      "source": "../plugins/council",
-      "category": "development"
+      "source": "./plugins/council",
+      "category": "development",
+      "version": "1.0.0",
+      "author": {
+        "name": "Ryan Hartman",
+        "email": "ryan@theryanhartman.com"
+      }
     }
   ]
 }
