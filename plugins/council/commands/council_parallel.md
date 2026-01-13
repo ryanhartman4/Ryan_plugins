@@ -113,6 +113,16 @@ Models took fundamentally different approaches. Analyzing strengths...
 
 2. **Early termination**: If both solutions are identical, don't analyze further.
 
+## Deliberation, Not Implementation
+
+This command is a **deliberation phase**—it does not auto-apply changes. The workflow:
+
+1. Council discusses and reaches consensus
+2. User reviews the proposed solution
+3. User says "do it" or enters Plan mode to implement
+
+This separation ensures you see the reasoning and can modify the approach before any code is written.
+
 ## Example Usage
 
 User: `/council_parallel implement a debounce function in TypeScript`
@@ -121,3 +131,4 @@ User: `/council_parallel implement a debounce function in TypeScript`
 2. Generate Claude solution independently
 3. Compare approaches
 4. Output consensus or synthesized result
+5. **User approves** → then implement

@@ -104,6 +104,16 @@ Maximum 2 debate rounds to prevent infinite loops.
 
 4. **Scope limit**: For large files, focus review on changed/critical sections
 
+## Deliberation, Not Implementation
+
+This command is a **deliberation phase**—it presents the "Final Improved Code" but does not auto-apply changes. The workflow:
+
+1. Council reviews and debates, reaching consensus on fixes
+2. User reviews the proposed improvements
+3. User says "do it" or enters Plan mode to apply changes
+
+This separation ensures you see the reasoning and can modify the approach before any code is written.
+
 ## Example Usage
 
 User: `/council_review
@@ -116,3 +126,4 @@ function processOrder(order) {
 2. Codex reviews for issues
 3. Debate any disagreements
 4. Output consolidated review with fixes
+5. **User approves** → then apply changes

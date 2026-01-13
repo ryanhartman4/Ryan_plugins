@@ -43,6 +43,37 @@ Quick code review by Codex without debate—just get a second opinion.
 - Codex CLI installed and authenticated
 - The `run_codex.sh` helper script (included in `scripts/`)
 
+## Deliberation → Implementation Workflow
+
+Council commands are designed as a **deliberation layer**, not direct implementation. The recommended workflow:
+
+```
+/council_parallel "add feature X"    # or /council_review
+        ↓
+[Claude + Codex discuss, compare, reach consensus]
+        ↓
+"do it" or enter Plan mode
+        ↓
+[Execute the agreed solution]
+```
+
+**Why this pattern works:**
+- You see the reasoning before any code changes
+- Two models validate the approach (catches blind spots)
+- You can reject or modify the consensus before implementation
+- The context from council discussion carries forward into implementation
+
+**Note:** Council commands deliberately do not auto-apply changes. This gives you control over what actually gets written to your codebase.
+
+### Future Enhancement
+
+A potential `--apply` flag or follow-up command could streamline this:
+```
+/council_parallel "add caching to the API"
+# ... council deliberates ...
+"apply council decision"  # → enters plan mode with pre-filled context
+```
+
 ## Token Efficiency
 
 All commands include built-in efficiency rules:
