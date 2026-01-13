@@ -2,21 +2,7 @@
   "name": "council",
   "description": "Council of LLMs - orchestrate multiple AI models for higher quality code generation",
   "version": "1.0.0",
-  "skills": [
-    {
-      "name": "council_parallel",
-      "path": "../skills/council_parallel.md",
-      "description": "Run Claude and Codex in parallel, use confidence voting with synthesis fallback"
-    },
-    {
-      "name": "council_review",
-      "path": "../skills/council_review.md",
-      "description": "One model generates, the other reviews, debate on disagreements"
-    },
-    {
-      "name": "council_simple_review",
-      "path": "../skills/council_simple_review.md",
-      "description": "Quick code review by Codex - get a second opinion without debate"
-    }
-  ]
+  "author": {
+    "name": "Ryan Hartman"
+  }
 }
