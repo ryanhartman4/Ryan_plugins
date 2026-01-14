@@ -4,19 +4,7 @@ Orchestrate multiple Claude instances for higher quality code generation through
 
 ## Installation
 
-**Step 1:** Add the marketplace
-```
-/plugin marketplace add kingbootoshi/claude-plugins
-```
-
-**Step 2:** Install the plugin
-```
-/plugin install parallel_claudes
-```
-
-**Step 3:** Restart Claude Code if prompted
-
-**Step 4:** Start using the commands
+Add this plugin directory to your Claude Code settings, then start using the commands:
 ```
 /parallel_claudes:parallel_generation your task here
 ```
