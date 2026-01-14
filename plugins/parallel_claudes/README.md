@@ -101,6 +101,60 @@ Specialized reviewer Claudes, each focused on a specific aspect of code quality.
 
 ---
 
+### `/parallel_claudes:swarm`
+
+Break down large tasks into MECE sub-tasks and execute them in parallel waves, applying changes directly to the codebase.
+
+> [!CAUTION]
+> **IMMEDIATE EXECUTION** - Unlike other parallel_claudes commands that follow a deliberation-first workflow, **swarm executes changes directly to your codebase** after plan approval. There is no intermediate review step before files are modified.
+>
+> **Before using swarm:**
+> - Ensure your working directory is clean (`git status`)
+> - Commit or stash any unsaved work
+> - Review the task graph carefully before approving
+> - Consider using `--context compressed` for isolated changes
+>
+> **If something goes wrong:** Use `git diff` to review changes and `git checkout .` to revert.
+
+**Use when:** You have a **larger, complex task** that can be decomposed into independent sub-tasks. Subagents have startup overhead (~5-15 seconds), so swarm is best for tasks where parallel execution saves meaningful time.
+
+**How it works:**
+1. Analyzes your task and breaks it into MECE (Mutually Exclusive, Collectively Exhaustive) sub-tasks
+2. Identifies dependencies between tasks and groups them into waves
+3. Displays the task graph for your approval (including agent types per task)
+4. Executes waves in parallel with real-time progress visualization
+5. Handles file conflicts (queues agents) and failures (asks you how to proceed)
+6. Offers verification (role_based_review or tests) after completion
+
+**Flags:**
+- `--count N` / `-n N`: Max concurrent agents per wave, 2-7 (default: 5)
+- `--model <model>`: Model for all agents — `sonnet`, `opus`, `haiku` (default: sonnet)
+- `--context <mode>`: `full` (default), `compressed`
+- `--agent <type>`: Default agent type — `general-purpose` (default), or any specialized agent
+
+**Specialized agents:** Individual tasks can use different agent types (e.g., `feature-dev:code-reviewer` for security review tasks). Claude will suggest specialized agents when appropriate.
+
+**Progress visualization:**
+```
+## Swarm Progress [12:34:56]
+
+Task 1 [████████████████████] 100% - Complete
+Task 2 [████████████░░░░░░░░]  66% - Planning changes
+Task 3 [████░░░░░░░░░░░░░░░░]  33% - Reading files
+Task 4 [░░░░░░░░░░░░░░░░░░░░]   0% - Queued (waiting on Task 2)
+
+Wave 1: 1/4 complete | Wave 2: Pending
+```
+
+**Example:**
+```
+/parallel_claudes:swarm add user authentication with JWT tokens, user model, auth routes, and tests
+/parallel_claudes:swarm -n 3 --model opus rename PaymentService to BillingService across the codebase
+/parallel_claudes:swarm --context compressed create unit tests for all utility functions
+```
+
+---
+
 ## Configuration Options
 
 ### Conflict Resolution Modes
@@ -122,7 +176,7 @@ Specialized reviewer Claudes, each focused on a specific aspect of code quality.
 
 ## Deliberation → Implementation Workflow
 
-All commands follow a **deliberation-first** pattern:
+Most commands follow a **deliberation-first** pattern (exception: `swarm` executes after plan approval):
 
 ```
 /parallel_claudes:parallel_generation "add feature X"
@@ -139,6 +193,34 @@ All commands follow a **deliberation-first** pattern:
 - Multiple perspectives validate the approach
 - You can reject or modify the consensus before implementation
 - Context from deliberation carries forward into implementation
+
+---
+
+## Recommended Workflow: Deliberate → Execute → Verify
+
+For complex features, the ideal path combines all three command types:
+
+```
+/parallel_claudes:parallel_generation "design user auth system"
+        ↓
+[Multiple Claudes propose approaches, reach consensus on design]
+        ↓
+/parallel_claudes:swarm "implement the agreed auth design"
+        ↓
+[Parallel agents execute: models, routes, middleware, tests]
+        ↓
+/parallel_claudes:role_based_review src/auth/
+        ↓
+[Security, performance, edge case experts review the changes]
+```
+
+**Phase 1 - Deliberate** (`parallel_generation`): Get multiple perspectives on *how* to build it. Catches design issues early.
+
+**Phase 2 - Execute** (`swarm`): Parallel implementation of the agreed design. Fast execution with dependency management.
+
+**Phase 3 - Verify** (`role_based_review`): Expert review from multiple angles. Catches implementation issues before commit.
+
+This workflow gives you the best of all worlds: thoughtful design, efficient execution, and thorough verification.
 
 ---
 
@@ -164,7 +246,7 @@ All commands validate flags before execution:
 
 | Flag | Valid Values | Default |
 |------|-------------|---------|
-| `--count` | 2-7 (integer) | 3 |
+| `--count` | 2-7 (integer) | 3 (5 for swarm) |
 | `--model` | sonnet, opus, haiku | sonnet |
 | `--conflict` | majority_vote, show_all, debate | majority_vote |
 | `--context` | full, compressed | full |

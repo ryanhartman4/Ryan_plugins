@@ -12,13 +12,21 @@ A single AI pass can have blind spots. These plugins address that by bringing mu
 
 ## Deliberation-First Philosophy
 
-These plugins are **thinking tools**, not auto-coders. They follow a deliberation → implementation pattern:
+These plugins are **thinking tools**, not auto-coders. Most commands follow a deliberation → implementation pattern:
 
 1. Multiple models discuss, compare approaches, and reach consensus
 2. You review the proposed solution and reasoning
 3. You decide whether to implement (say "do it" or enter plan mode)
 
 This keeps you in control. You see the "why" before any code changes, and you can reject or modify the consensus before anything touches your codebase.
+
+**Exception:** `swarm` executes immediately after you approve the task breakdown—it's designed for complex multi-part tasks where you want parallel execution, not deliberation.
+
+> [!CAUTION]
+> **The `swarm` command breaks the deliberation-first pattern.** Unlike other commands that let you review before changes happen, swarm spawns multiple Claude instances that execute tasks immediately and in parallel. Once approved, sub-tasks run without further confirmation. Use with care:
+> - Review the task breakdown carefully before approving
+> - Ensure your git state is clean so you can revert if needed
+> - Consider using on a branch rather than main
 
 ## Choosing a Plugin
 
@@ -29,6 +37,7 @@ This keeps you in control. You see the "why" before any code changes, and you ca
 | Configurable instance count (2-7) | **parallel_claudes** |
 | Role-based expert reviews (security, perf, etc.) | **parallel_claudes** |
 | Quick second opinion from Codex | **council** (`council_simple_review`) |
+| Execute complex multi-part tasks in parallel | **parallel_claudes** (`swarm`) |
 
 **Note**: Council requires Codex CLI installed. Parallel Claudes works with Claude alone.
 
@@ -51,3 +60,6 @@ Commands:
 - `/parallel_claudes:parallel_generation` - Run multiple Claudes in parallel with confidence voting
 - `/parallel_claudes:generation_and_review` - One Claude generates, multiple review in parallel
 - `/parallel_claudes:role_based_review` - Specialized reviewers (security, performance, edge cases, etc.)
+- `/parallel_claudes:swarm` - Break down complex tasks into MECE (non-overlapping, complete coverage) sub-tasks and execute in parallel waves
+
+**Ideal workflow for complex features:** `parallel_generation` (deliberate on design) → `swarm` (parallel execution) → `role_based_review` (verify changes)
