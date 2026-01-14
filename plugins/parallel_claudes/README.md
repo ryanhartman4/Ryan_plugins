@@ -246,15 +246,16 @@ All commands validate flags before execution:
 
 | Flag | Valid Values | Default |
 |------|-------------|---------|
-| `--count` | 2-7 (integer) | 3 (5 for swarm) |
+| `--count` | 1-7 (review), 2-7 (generation/swarm) | 3 (5 for swarm) |
 | `--model` | sonnet, opus, haiku | sonnet |
 | `--conflict` | majority_vote, show_all, debate | majority_vote |
 | `--context` | full, compressed | full |
 | `--roles` | security, performance, edge_cases, maintainability, testing | all 5 |
+| `--agent` | general-purpose, or any specialized agent type | general-purpose |
 
 **Behavior:**
 - Invalid values trigger a warning and fall back to defaults
-- Out-of-range `--count` is clamped (min 2 for voting, max 7 for cost control)
+- Out-of-range `--count` is clamped (min 1 for review commands, min 2 for generation/swarm, max 7 for cost control)
 - Invalid role names are skipped with a warning
 
 ---

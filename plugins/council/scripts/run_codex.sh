@@ -7,6 +7,13 @@
 
 set -euo pipefail
 
+# Verify Codex CLI is available
+if ! command -v codex &> /dev/null; then
+    echo "Error: Codex CLI is not installed or not in PATH" >&2
+    echo "Install from: https://github.com/openai/codex" >&2
+    exit 1
+fi
+
 # Input validation
 if [[ -z "${1:-}" ]]; then
     echo "Error: Prompt is required" >&2

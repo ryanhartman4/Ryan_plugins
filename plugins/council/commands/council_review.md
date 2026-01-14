@@ -36,7 +36,7 @@ CODE:
 Provide specific line-by-line feedback.
 PROMPT_END
 )
-${CLAUDE_PLUGIN_ROOT}/scripts/run_codex.sh "$REVIEW_PROMPT" "WORKING_DIR"
+${CLAUDE_PLUGIN_ROOT}/scripts/run_codex.sh "$REVIEW_PROMPT" "$(pwd)"
 ```
 
 ### Step 4: Analyze Review Feedback

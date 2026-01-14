@@ -43,6 +43,14 @@ Quick code review by Codex without debate—just get a second opinion.
 - Codex CLI installed and authenticated
 - The `run_codex.sh` helper script (included in `scripts/`)
 
+## Timeout Behavior
+
+The `run_codex.sh` script includes built-in timeouts for reliability:
+- **5-minute check-in**: Prints a status message if Codex is still working
+- **10-minute hard timeout**: Terminates Codex and returns partial results if available
+
+If you consistently hit timeouts, consider breaking your task into smaller chunks or simplifying the prompt.
+
 ## Deliberation → Implementation Workflow
 
 Council commands are designed as a **deliberation layer**, not direct implementation. The recommended workflow:

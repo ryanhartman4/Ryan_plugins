@@ -45,7 +45,7 @@ FILE: [filename]
 Provide a structured review with severity levels (critical/warning/suggestion).
 PROMPT_END
 )
-${CLAUDE_PLUGIN_ROOT}/scripts/run_codex.sh "$REVIEW_PROMPT" "WORKING_DIR"
+${CLAUDE_PLUGIN_ROOT}/scripts/run_codex.sh "$REVIEW_PROMPT" "$(pwd)"
 ```
 
 ### Step 3: Present Codex's Review
