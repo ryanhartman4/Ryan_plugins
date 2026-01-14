@@ -81,10 +81,21 @@ Analyze the task and break it into sub-tasks following MECE principles:
 4. Estimate which files each task will create or modify
 5. Group independent tasks into waves
 
+**Task Types - Implementation vs Research:**
+When decomposing, identify each task's type:
+- **Implementation tasks**: Output is files created/modified. Downstream tasks can read those files directly.
+- **Research tasks**: Output is findings/analysis text. Downstream tasks need the actual text output passed to them.
+
+For research tasks that feed into later waves, consider:
+- Is the research actually needed, or can the implementation task do its own quick exploration?
+- If research IS needed, ensure you'll extract and pass the full findings (see Step 5)
+- For small codebases (<20 files), parallel research may add overhead without value—one agent can explore quickly
+
 **When NOT to decompose:**
 - Simple single-file changes → Just execute directly
 - Tasks under 20 lines of changes → Execute without swarm overhead
 - If only 1 task results from decomposition → Execute directly, no swarm needed
+- Research-then-implement on small codebases → Single agent is often faster
 
 ### Step 3: Display Task Graph
 
@@ -95,37 +106,49 @@ Present the decomposition to the user for approval:
 
 ### Wave 1 (no dependencies)
 - [1] [Task description]
-  Files: [estimated files to create/modify]
+  Type: implementation | Files: [estimated files to create/modify]
   Agent: general-purpose
 - [2] [Task description]
-  Files: [estimated files]
+  Type: research | Output: findings passed to dependent tasks
   Agent: general-purpose
 
 ### Wave 2 (depends on Wave 1)
-- [3] [Task description] (depends on: 1)
-  Files: [estimated files]
+- [3] [Task description] (depends on: 1, 2)
+  Type: implementation | Files: [estimated files]
   Agent: general-purpose
 - [4] Security review of auth changes (depends on: 1, 2)
-  Files: [read-only review]
+  Type: research | Output: review findings
   Agent: feature-dev:code-reviewer ← specialized
 
 ### Wave 3
 - [5] [Task description] (depends on: 3, 4)
-  Files: [estimated files]
+  Type: implementation | Files: [estimated files]
   Agent: general-purpose
 
 ---
 Total: [N] tasks across [M] waves
 Estimated agents needed: [count] (max [configured max] concurrent)
-Specialized agents: [list any non-general agents]
+Research tasks: [count] (outputs will be extracted and passed to dependents)
+```
 
-Proceed with this plan? (yes/no/modify)
+**IMPORTANT:** Use `AskUserQuestion` to request plan approval:
+```
+AskUserQuestion with:
+  question: "Proceed with this task breakdown?"
+  header: "Swarm Plan"
+  options:
+    - label: "Yes, execute"
+      description: "Begin parallel execution of all waves"
+    - label: "Modify"
+      description: "Request changes to task breakdown or agent types"
+    - label: "Abort"
+      description: "Cancel swarm execution"
 ```
 
 **User options:**
-- **yes**: Begin execution
-- **no**: Abort swarm
-- **modify**: User can request changes to the decomposition (including agent types)
+- **Yes, execute**: Begin execution
+- **Modify**: User can request changes to the decomposition (including agent types)
+- **Abort**: Cancel swarm
 
 ### Step 4: Permission Warmup
 
@@ -170,24 +193,52 @@ For each wave:
 
 4. **Wave completion**: Wait for all wave agents to complete before starting next wave
 
+5. **Extract outputs for dependent tasks**: Before launching the next wave, extract actual outputs from completed agents:
+   - Use `TaskOutput` with `block=true` to get final output from each completed agent
+   - For **implementation tasks**: Note which files were created/modified (the files ARE the output)
+   - For **research/exploration tasks**: Extract the agent's findings text—this IS the valuable output that must be passed forward
+   - Store these outputs to include in dependent task prompts
+
+**CRITICAL - Research Task Output Handling:**
+When Wave N contains research/exploration tasks (mapping, analysis, investigation), their text output contains the findings. You MUST:
+1. Read the full output from each research agent (not just check completion status)
+2. Extract key findings, not just write your own 1-sentence summary
+3. Include substantive excerpts or the full findings in Wave N+1 prompts
+
+**Anti-pattern to avoid:**
+```
+❌ BAD: "Task 1 mapped the auth module" (your summary, not the agent's findings)
+✅ GOOD: Include actual output: "Task 1 findings: [paste agent's analysis here]"
+```
+
+If you summarize instead of passing actual output, Wave N was wasted—Wave N+1 will just redo the work.
+
 **Agent Prompt Template:**
 ```
 You are executing Task [N] of a swarm operation.
 
 TASK: [description]
 
-DIRECT DEPENDENCIES (only tasks this one depends on):
-- [dependency task]: [1-sentence summary of what it created/modified]
+DEPENDENCIES AND THEIR OUTPUTS:
 
-FILES AVAILABLE FROM DEPENDENCIES:
-- [list only files from direct predecessor tasks]
+[For each dependency task, include ONE of the following based on task type:]
+
+[If dependency was an IMPLEMENTATION task:]
+- Task [X] created/modified these files: [file list]
+  You can read these files directly.
+
+[If dependency was a RESEARCH/EXPLORATION task:]
+- Task [X] findings:
+  """
+  [Paste the actual output/findings from that agent here - not your summary]
+  """
 
 CONSTRAINTS:
 - Focus ONLY on this specific task
 - Your file scope: [list of files you may create/modify]
 - Do not modify files outside your scope
 - Apply changes directly - this is an execution task, not review
-- Only reference files from your direct dependencies, not the full task history
+- Use the dependency outputs above—don't redo research that was already done
 
 PROGRESS REPORTING (required):
 Output these markers as you work:
