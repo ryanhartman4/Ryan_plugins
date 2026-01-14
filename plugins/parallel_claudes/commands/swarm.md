@@ -16,7 +16,7 @@ The user provides a task description:
 **Optional flags:**
 - `--count N` / `-n N`: Max concurrent agents per wave (default: 5)
 - `--model <model>`: Model for all agents — `sonnet`, `opus`, `haiku` (default: sonnet)
-- `--context <mode>`: Context strategy — `full`, `compressed` (default: full)
+- `--context <mode>`: Context strategy — `compressed` (default), `full`
 - `--agent <type>`: Default agent type for tasks — `general-purpose` (default), or any available subagent type
 
 **Note:** Swarm does not support `--conflict` mode (unlike other parallel_claudes commands) because it executes tasks directly rather than deliberating on solutions.
@@ -33,7 +33,7 @@ Before executing, validate all flags:
 |------|-------------|---------|------------|
 | `--count` / `-n` | 2-7 (integer) | 5 | Clamp to range, warn |
 | `--model` | sonnet, opus, haiku | sonnet | Warn and use default |
-| `--context` | full, compressed | full | Warn and use default |
+| `--context` | compressed, full | compressed | Warn and use default |
 
 ### Error Messages
 
@@ -127,7 +127,31 @@ Proceed with this plan? (yes/no/modify)
 - **no**: Abort swarm
 - **modify**: User can request changes to the decomposition (including agent types)
 
-### Step 4: Execute Waves
+### Step 4: Permission Warmup
+
+Background agents cannot prompt for permissions interactively. Before launching agents, grant Edit permissions by making a minimal no-op edit to representative files.
+
+**Process:**
+1. Identify unique directories from the task breakdown's file list
+2. For each directory, select one existing file that will be modified
+3. Display explanation to user:
+   ```
+   ## Permission Warmup
+
+   Background agents can't request edit permissions interactively.
+   I'll make a small no-op edit to these files to grant permission:
+   - [file1]
+   - [file2]
+
+   **Important:** When prompted, select "Always allow" or "Allow all edits" to grant
+   permission for the entire session. This allows background agents to write files.
+   ```
+4. For each file, make a trivial edit (add a trailing newline, then remove it) using the Edit tool
+5. The user selecting "Always allow" grants Edit permission to background agents for the session
+
+**Note:** If all tasks only create new files (no modifications), this step can be skipped since Write permissions for new files don't require warmup.
+
+### Step 5: Execute Waves
 
 **CRITICAL:** Use `run_in_background=true` for all agents to enable progress monitoring.
 
@@ -152,15 +176,18 @@ You are executing Task [N] of a swarm operation.
 
 TASK: [description]
 
-CONTEXT:
-- Previous tasks completed: [list with summaries]
-- Files created/modified by previous tasks: [list]
+DIRECT DEPENDENCIES (only tasks this one depends on):
+- [dependency task]: [1-sentence summary of what it created/modified]
+
+FILES AVAILABLE FROM DEPENDENCIES:
+- [list only files from direct predecessor tasks]
 
 CONSTRAINTS:
 - Focus ONLY on this specific task
 - Your file scope: [list of files you may create/modify]
 - Do not modify files outside your scope
 - Apply changes directly - this is an execution task, not review
+- Only reference files from your direct dependencies, not the full task history
 
 PROGRESS REPORTING (required):
 Output these markers as you work:
@@ -172,7 +199,7 @@ Output these markers as you work:
 Execute the task now.
 ```
 
-### Step 5: Handle File Conflicts
+### Step 6: Handle File Conflicts
 
 If during execution an agent needs a file another agent is modifying:
 
@@ -181,7 +208,7 @@ If during execution an agent needs a file another agent is modifying:
 3. When blocking task completes, resume queued agent with fresh file state
 4. Update progress display to show queued status
 
-### Step 6: Handle Failures
+### Step 7: Handle Failures
 
 If a task fails:
 
@@ -204,7 +231,7 @@ If a task fails:
 3. Wait for user decision via AskUserQuestion
 4. Execute chosen option
 
-### Step 7: Summary & Verification
+### Step 8: Summary & Verification
 
 After all waves complete:
 
@@ -305,7 +332,7 @@ If task cannot be meaningfully decomposed:
 ### Agent Timeout
 If an agent doesn't respond within 10 minutes:
 - Mark task as failed
-- Trigger failure handling flow (Step 6)
+- Trigger failure handling flow (Step 7)
 
 ### All Tasks in Single Wave
 If decomposition results in all tasks being independent:

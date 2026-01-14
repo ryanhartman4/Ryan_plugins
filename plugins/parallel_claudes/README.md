@@ -2,6 +2,38 @@
 
 Orchestrate multiple Claude instances for higher quality code generation through parallel execution, independent perspectives, and specialized reviews.
 
+## Installation
+
+**Step 1:** Add the marketplace
+```
+/plugin marketplace add kingbootoshi/claude-plugins
+```
+
+**Step 2:** Install the plugin
+```
+/plugin install parallel_claudes
+```
+
+**Step 3:** Restart Claude Code if prompted
+
+**Step 4:** Start using the commands
+```
+/parallel_claudes:parallel_generation your task here
+```
+
+## What it Does
+
+- Spawns multiple Claude instances in parallel for independent code generation
+- Applies confidence voting and synthesis to merge solutions
+- Provides specialized role-based review from security, performance, and maintainability perspectives
+
+## How it Works
+
+1. You provide a task or code to review
+2. Multiple Claude subagents execute independently in parallel
+3. Solutions are compared for agreement level (strong, partial, or disagreement)
+4. Results are synthesized through voting, debate, or user choice
+
 ## Why Parallel Claudes?
 
 - **No external dependencies**: Unlike council (which requires Codex CLI), this plugin works with Claude alone
@@ -28,7 +60,7 @@ Run multiple Claude instances in parallel on the same task, then apply confidenc
 - `--count N` / `-n N`: Number of instances, 2-7 (default: 3)
 - `--model <model>`: Model for all instances — `sonnet`, `opus`, `haiku` (default: sonnet)
 - `--conflict <mode>`: `majority_vote` (default), `show_all`, `debate`
-- `--context <mode>`: `full` (default), `compressed`
+- `--context <mode>`: `compressed` (default), `full`
 
 **Example:**
 ```
@@ -55,7 +87,7 @@ One Claude generates a solution, then multiple Claudes review it in parallel for
 - `--count N` / `-n N`: Number of reviewers, 1-7 (default: 3)
 - `--model <model>`: Model — `sonnet`, `opus`, `haiku` (default: sonnet)
 - `--conflict <mode>`: `majority_vote` (default), `show_all`, `debate`
-- `--context <mode>`: `full` (default), `compressed`
+- `--context <mode>`: `compressed` (default), `full`
 
 **Example:**
 ```
@@ -90,7 +122,7 @@ Specialized reviewer Claudes, each focused on a specific aspect of code quality.
 
 **Flags:**
 - `--roles <list>`: Comma-separated roles — `security`, `performance`, `edge_cases`, `maintainability`, `testing` (default: all 5)
-- `--context <mode>`: `full` (default), `compressed`
+- `--context <mode>`: `full` (default), `compressed` — uses full context by default so reviewers understand intent
 
 **Example:**
 ```
@@ -129,7 +161,7 @@ Break down large tasks into MECE sub-tasks and execute them in parallel waves, a
 **Flags:**
 - `--count N` / `-n N`: Max concurrent agents per wave, 2-7 (default: 5)
 - `--model <model>`: Model for all agents — `sonnet`, `opus`, `haiku` (default: sonnet)
-- `--context <mode>`: `full` (default), `compressed`
+- `--context <mode>`: `compressed` (default), `full`
 - `--agent <type>`: Default agent type — `general-purpose` (default), or any specialized agent
 
 **Specialized agents:** Individual tasks can use different agent types (e.g., `feature-dev:code-reviewer` for security review tasks). Claude will suggest specialized agents when appropriate.
@@ -169,8 +201,10 @@ Wave 1: 1/4 complete | Wave 2: Pending
 
 | Mode | Behavior |
 |------|----------|
-| `full` | Agents receive full conversation context. Best for consistency. (Default) |
-| `compressed` | Agents receive only task + relevant files. Best for fresh perspective. |
+| `compressed` | Agents receive only task + relevant files. Conserves context. (Default for most commands) |
+| `full` | Agents receive full conversation context. Better for analysis tasks. |
+
+**Note:** `role_based_review` defaults to `full` because reviewers benefit from understanding the broader context and intent behind the code.
 
 ---
 
@@ -249,7 +283,7 @@ All commands validate flags before execution:
 | `--count` | 1-7 (review), 2-7 (generation/swarm) | 3 (5 for swarm) |
 | `--model` | sonnet, opus, haiku | sonnet |
 | `--conflict` | majority_vote, show_all, debate | majority_vote |
-| `--context` | full, compressed | full |
+| `--context` | compressed, full | compressed |
 | `--roles` | security, performance, edge_cases, maintainability, testing | all 5 |
 | `--agent` | general-purpose, or any specialized agent type | general-purpose |
 

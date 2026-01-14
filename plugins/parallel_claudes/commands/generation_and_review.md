@@ -16,7 +16,7 @@ The user provides either:
 - `--count N` or `-n N`: Number of parallel reviewers (default: 3)
 - `--model <model>`: Model for all instances (sonnet, opus, haiku)
 - `--conflict <mode>`: Resolution mode - `majority_vote` (default), `show_all`, `debate`
-- `--context <mode>`: Context strategy - `full` (default), `compressed`
+- `--context <mode>`: Context strategy - `compressed` (default), `full`
 
 ## Input Validation
 
@@ -29,7 +29,7 @@ Before executing, validate all flags and show configuration:
 | `--count` | 1-7 (integer) | 3 | Warn and use default |
 | `--model` | sonnet, opus, haiku | sonnet | Warn and use default |
 | `--conflict` | majority_vote, show_all, debate | majority_vote | Warn and use default |
-| `--context` | full, compressed | full | Warn and use default |
+| `--context` | compressed, full | compressed | Warn and use default |
 
 **Note:** `--count 1` is valid for reviews (single reviewer) but provides no cross-validation benefit. Recommend 2+ for confidence.
 
@@ -148,8 +148,9 @@ Collect all reviewer responses and aggregate findings:
 ```
 ## Parallel Review Complete
 
-### Code Under Review
-[original code]
+### Files Reviewed
+- [file path 1]
+- [file path 2]
 
 ### High-Confidence Issues (Multiple Reviewers Agreed)
 These issues were flagged by 2+ reviewers:
@@ -157,31 +158,35 @@ These issues were flagged by 2+ reviewers:
 #### Critical
 - [ ] **[Issue]** (line X) - Found by [N] reviewers
   - Description: [what's wrong]
-  - Fix: [suggested fix]
+  - Suggested diff:
+    ```diff
+    - [old line]
+    + [new line]
+    ```
 
 #### Warnings
 - [ ] **[Issue]** (line X) - Found by [N] reviewers
   - Description: [what's wrong]
-  - Fix: [suggested fix]
+  - Suggested diff:
+    ```diff
+    - [old line]
+    + [new line]
+    ```
 
 ### Additional Findings (Single Reviewer)
 These may still be valuable:
 
 - [ ] **[Issue]** (line X) - Reviewer [N]
-  - [description and fix]
+  - [description and suggested diff]
 
 ### Reviewer Agreement Summary
 | Issue | R1 | R2 | R3 | Consensus |
 |-------|----|----|----|-----------|
 | [issue] | ✓ | ✓ | - | 2/3 |
 
-### Proposed Fixes
-Based on consensus, here's the improved code:
-
-[code with all high-confidence fixes applied]
-
 ---
 **Next step:** Say "do it" to apply fixes, or specify which issues to address
+**Note:** Showing diffs instead of full code to conserve context.
 ```
 
 **If --conflict show_all:**
@@ -190,13 +195,16 @@ Based on consensus, here's the improved code:
 ## Parallel Review Complete: All Reviews
 
 ### Reviewer 1
-[full review output]
+**Critical:** [count] | **Warnings:** [count] | **Suggestions:** [count]
+Key findings: [1-2 sentence summary of most important issues]
 
 ### Reviewer 2
-[full review output]
+**Critical:** [count] | **Warnings:** [count] | **Suggestions:** [count]
+Key findings: [1-2 sentence summary of most important issues]
 
 ### Reviewer 3
-[full review output]
+**Critical:** [count] | **Warnings:** [count] | **Suggestions:** [count]
+Key findings: [1-2 sentence summary of most important issues]
 
 ### Issue Comparison
 | Issue | R1 | R2 | R3 |

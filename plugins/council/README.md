@@ -2,6 +2,38 @@
 
 Orchestrate multiple AI models (Claude + Codex) for higher quality code generation through parallel execution, cross-review, and debate.
 
+## Installation
+
+**Step 1:** Add the marketplace
+```
+/plugin marketplace add kingbootoshi/claude-plugins
+```
+
+**Step 2:** Install the plugin
+```
+/plugin install council
+```
+
+**Step 3:** Restart Claude Code if prompted
+
+**Step 4:** Start using the commands
+```
+/council:council_parallel your task here
+```
+
+## What it Does
+
+- Runs Claude and Codex in parallel on the same task for diverse perspectives
+- Enables cross-model code review with debate on disagreements
+- Applies confidence voting and synthesis to reach consensus
+
+## How it Works
+
+1. You provide a task or code to review
+2. Claude and Codex both generate solutions independently
+3. Solutions are compared for agreement level (strong, partial, or disagreement)
+4. Debate rounds resolve conflicts, or results are synthesized for user decision
+
 ## Commands
 
 ### `/council:council_parallel`

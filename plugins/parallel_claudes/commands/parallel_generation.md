@@ -14,7 +14,7 @@ The user's coding task/prompt follows the skill invocation.
 - `--count N` or `-n N`: Number of parallel instances (default: 3)
 - `--model <model>`: Model for all instances (sonnet, opus, haiku)
 - `--conflict <mode>`: Resolution mode - `majority_vote` (default), `show_all`, `debate`
-- `--context <mode>`: Context strategy - `full` (default), `compressed`
+- `--context <mode>`: Context strategy - `compressed` (default), `full`
 
 ## Input Validation
 
@@ -27,7 +27,7 @@ Before executing, validate all flags and show configuration:
 | `--count` | 2-7 (integer) | 3 | Warn and use default |
 | `--model` | sonnet, opus, haiku | sonnet | Warn and use default |
 | `--conflict` | majority_vote, show_all, debate | majority_vote | Warn and use default |
-| `--context` | full, compressed | full | Warn and use default |
+| `--context` | compressed, full | compressed | Warn and use default |
 
 ### Error Messages
 
@@ -179,15 +179,21 @@ Instances took fundamentally different approaches. Analyzing strengths...
 
 ### Instance 1
 **Approach:** [summary]
-[code]
+**Key difference:** [what distinguishes this approach]
+**Core snippet:**
+[only the key 10-20 lines that show the approach - not full code]
 
 ### Instance 2
 **Approach:** [summary]
-[code]
+**Key difference:** [what distinguishes this approach]
+**Core snippet:**
+[only the key 10-20 lines that show the approach - not full code]
 
 ### Instance 3
 **Approach:** [summary]
-[code]
+**Key difference:** [what distinguishes this approach]
+**Core snippet:**
+[only the key 10-20 lines that show the approach - not full code]
 
 ### Comparison Matrix
 | Aspect | Instance 1 | Instance 2 | Instance 3 |
@@ -195,6 +201,8 @@ Instances took fundamentally different approaches. Analyzing strengths...
 | Approach | ... | ... | ... |
 | Performance | ... | ... | ... |
 | Readability | ... | ... | ... |
+
+**Note:** Full solutions available on request. Showing snippets to conserve context.
 
 ### Recommendation
 [Which solution I'd recommend and why, but user decides]
