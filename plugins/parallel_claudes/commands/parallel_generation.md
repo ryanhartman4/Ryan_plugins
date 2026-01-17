@@ -84,14 +84,19 @@ For trivial tasks (single function, <20 lines, no algorithmic complexity), skip 
 
 ### Step 3: Spawn Parallel Claude Instances
 
-**CRITICAL:** Launch all agents in a SINGLE message with multiple Task tool calls to ensure true parallel execution.
+**CRITICAL:** Launch all agents in a SINGLE message with multiple Task tool calls to ensure true parallel execution. Use `run_in_background=true` for each agent.
+
+**Setup:** Before spawning agents, create the output directory:
+```bash
+mkdir -p .parallel
+```
 
 **If `--roles` is specified:**
 
 Load specialized agent definitions and spawn one agent per role:
 
 1. For each role, read the agent file from `${CLAUDE_PLUGIN_ROOT}/agents/{role}_agent.md`
-2. Construct the prompt with the agent definition + task + mode override:
+2. Construct the prompt with the agent definition + task + mode override + progress reporting:
    ```
    [Full content of agents/{role}_agent.md]
 
@@ -110,10 +115,30 @@ Load specialized agent definitions and spawn one agent per role:
    - Maintainability agents: Focus on clean architecture, clear naming, SOLID principles
    - Testing agents: Focus on testable structure, dependency injection, clear interfaces
 
-   Output a complete code solution with brief notes on how your specialization influenced the implementation.
-   Do NOT output CRITICAL/WARNING/SUGGESTION sections or verdicts.
+   PROGRESS REPORTING:
+   - [CHECKPOINT: UNDERSTANDING_TASK]
+   - [CHECKPOINT: GENERATING_SOLUTION]
+   - [CHECKPOINT: FINALIZING]
+   - [TASK_COMPLETE] Summary: [1 sentence] Handoff: .parallel/instance_[N]_solution.md
+
+   Write your detailed solution to `.parallel/instance_[N]_solution.md` in this format:
+   # Instance [N] Output ([role] perspective)
+
+   ## Summary
+   [1-2 sentence summary of approach]
+
+   ## Solution
+   [Complete code solution]
+
+   ## Design Decisions
+   [Key decisions made and how your specialization influenced them]
+
+   Your final message should be MINIMAL:
+   [TASK_COMPLETE]
+   Summary: [1 sentence describing approach]
+   Handoff: .parallel/instance_[N]_solution.md
    ```
-3. Launch with `subagent_type=general-purpose`
+3. Launch with `subagent_type=general-purpose` and `run_in_background=true`
 
 Example with `--roles security,performance`:
 - Agent 1 loads `security_agent.md` → implements with security-first thinking
@@ -121,7 +146,7 @@ Example with `--roles security,performance`:
 
 **If `--roles` is NOT specified (default):**
 
-Launch N generic Claude subagents using the Task tool with `subagent_type=general-purpose`.
+Launch N generic Claude subagents using the Task tool with `subagent_type=general-purpose` and `run_in_background=true`.
 
 For each agent, provide a focused prompt based on context mode:
 
@@ -133,10 +158,28 @@ TASK: [user's coding task]
 
 Generate a complete solution. Think through the problem independently. Do not hedge or provide multiple alternatives - commit to your best approach.
 
-Output format:
-1. Brief approach summary (2-3 sentences)
-2. Complete code solution
-3. Key design decisions made
+PROGRESS REPORTING:
+- [CHECKPOINT: UNDERSTANDING_TASK]
+- [CHECKPOINT: GENERATING_SOLUTION]
+- [CHECKPOINT: FINALIZING]
+- [TASK_COMPLETE] Summary: [1 sentence] Handoff: .parallel/instance_[N]_solution.md
+
+Write your detailed solution to `.parallel/instance_[N]_solution.md` in this format:
+# Instance [N] Output
+
+## Summary
+[1-2 sentence summary of approach]
+
+## Solution
+[Complete code solution]
+
+## Design Decisions
+[Key decisions made]
+
+Your final message should be MINIMAL:
+[TASK_COMPLETE]
+Summary: [1 sentence describing approach]
+Handoff: .parallel/instance_[N]_solution.md
 ```
 
 **If --context compressed:**
@@ -146,15 +189,76 @@ TASK: [user's coding task]
 RELEVANT FILES:
 [only files directly needed for the task]
 
-Generate a complete solution with:
-1. Approach summary
-2. Code
-3. Key decisions
+PROGRESS REPORTING:
+- [CHECKPOINT: UNDERSTANDING_TASK]
+- [CHECKPOINT: GENERATING_SOLUTION]
+- [CHECKPOINT: FINALIZING]
+- [TASK_COMPLETE] Summary: [1 sentence] Handoff: .parallel/instance_[N]_solution.md
+
+Write your detailed solution to `.parallel/instance_[N]_solution.md` in this format:
+# Instance [N] Output
+
+## Summary
+[1-2 sentence summary of approach]
+
+## Solution
+[Complete code solution]
+
+## Design Decisions
+[Key decisions made]
+
+Your final message should be MINIMAL:
+[TASK_COMPLETE]
+Summary: [1 sentence describing approach]
+Handoff: .parallel/instance_[N]_solution.md
 ```
+
+### Step 3.5: Progress Monitoring
+
+While agents execute in background, monitor their progress:
+
+**Monitoring Loop:**
+```
+Every 10-15 seconds while agents are running:
+1. Check each agent's output file with: tail -n 10 .parallel/instance_[N]_solution.md
+2. Parse for checkpoint markers in agent output
+3. Display progress visualization
+```
+
+**Progress Display Format:**
+```
+## Generation Progress
+
+| Instance | Status | Current Phase |
+|----------|--------|---------------|
+| 1 | Running | [CHECKPOINT: GENERATING_SOLUTION] |
+| 2 | Running | [CHECKPOINT: UNDERSTANDING_TASK] |
+| 3 | Complete | [TASK_COMPLETE] |
+
+Elapsed: 45s
+```
+
+**Completion Detection:**
+- Parse agent output for `[TASK_COMPLETE]` marker
+- Agent is complete when its handoff file exists AND contains `[TASK_COMPLETE]` or agent has finished
+- All agents complete → proceed to Step 4
+
+**Important:** Do NOT use TaskOutput to read full agent responses. Use `tail -n 10` on output files to check progress with minimal context consumption.
 
 ### Step 4: Collect and Compare Solutions
 
-Wait for all agents to complete. Analyze solutions for agreement:
+Once all agents complete, read solutions from `.parallel/` files:
+
+```bash
+# Read each instance's solution
+cat .parallel/instance_1_solution.md
+cat .parallel/instance_2_solution.md
+cat .parallel/instance_3_solution.md
+```
+
+**Note:** The orchestrator reads the handoff files to get full solutions. Agent final messages only contain minimal summaries to conserve orchestrator context.
+
+Analyze solutions for agreement:
 
 **Check for:**
 1. **Structural agreement**: Same overall approach/architecture?
@@ -279,6 +383,16 @@ Identify disagreement points and spawn a debate round:
 [Any points that couldn't be resolved]
 ```
 
+### Step 6: Cleanup
+
+After presenting results to the user, clean up temporary files:
+
+```bash
+rm -rf .parallel
+```
+
+This prevents stale data from affecting future runs and keeps the working directory clean.
+
 ## Error Handling
 
 ### Missing Task
@@ -307,9 +421,13 @@ When `--count 2`:
 <!-- SYNC: token-efficiency-parallel -->
 
 1. **Parallel execution**: Always launch all Task agents in a single message
-2. **Early termination**: If all solutions are identical, skip detailed analysis
-3. **Context compression**: When --context compressed, send only essential files
-4. **Batch comparison**: Compare all solutions at once, not pairwise
+2. **Background execution**: Launch all instance agents with `run_in_background=true`
+3. **File-based handoff**: Instances write to `.parallel/` files; orchestrator only receives minimal summaries in final messages
+4. **Tail-based monitoring**: Use `tail -n 10` on output files to check progress, NOT TaskOutput
+5. **Early termination**: If all solutions are identical, skip detailed analysis
+6. **Context compression**: When --context compressed, send only essential files
+7. **Batch comparison**: Compare all solutions at once, not pairwise
+8. **Cleanup**: After presenting results, remove `.parallel/` directory to avoid stale data
 
 ## Deliberation, Not Implementation
 <!-- SYNC: deliberation-disclaimer -->

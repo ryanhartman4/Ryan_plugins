@@ -89,7 +89,11 @@ Examples:
 
 For each selected role, load the agent definition from the `agents/` directory.
 
-**CRITICAL:** Launch all role agents in a SINGLE message with multiple Task tool calls.
+**CRITICAL:** Launch all role agents in a SINGLE message with multiple Task tool calls using `run_in_background=true`.
+
+**Setup:**
+1. Create the handoff directory: `mkdir -p .parallel`
+2. If `.gitignore` exists and doesn't contain `.parallel`, append `.parallel` to it
 
 **Agent Loading Process:**
 
@@ -100,26 +104,68 @@ For each selected role, load the agent definition from the `agents/` directory.
    - `maintainability` → Read `${CLAUDE_PLUGIN_ROOT}/agents/maintainability_agent.md`
    - `testing` → Read `${CLAUDE_PLUGIN_ROOT}/agents/testing_agent.md`
 
-2. Construct the prompt for each agent:
-   ```
-   [Full content of the agent definition file]
+2. Construct the prompt for each agent using the template below
 
-   ---
+3. Launch the Task tool with `subagent_type=general-purpose` and `run_in_background=true` for each role agent
 
-   CODE TO REVIEW:
-   [the code being reviewed]
+**Agent Prompt Template:**
 
-   FILES:
-   [file paths if applicable]
-   ```
+```
+[Full content of the agent definition file]
 
-3. Launch the Task tool with `subagent_type=general-purpose` for each role agent.
+---
+
+CODE TO REVIEW:
+[the code being reviewed]
+
+FILES:
+[file paths if applicable]
+
+---
+
+PROGRESS REPORTING:
+Report progress with these checkpoint markers:
+- [CHECKPOINT: READING_CODE]
+- [CHECKPOINT: ANALYZING]
+- [CHECKPOINT: WRITING_FINDINGS]
+- [TASK_COMPLETE] Summary: [1 sentence] Handoff: .parallel/role_[role]_review.md
+
+HANDOFF OUTPUT (CRITICAL - keeps orchestrator context clean):
+Write your detailed findings to `.parallel/role_[role]_review.md` in this format:
+
+```markdown
+# [Role] Review Output
+
+## Summary
+[1-2 sentence summary of findings]
+
+## Verdict
+[SECURE/OPTIMAL/ROBUST/CLEAN/WELL-TESTED] or [NEEDS ATTENTION/NEEDS OPTIMIZATION/FRAGILE/NEEDS REFACTORING/NEEDS TESTS]
+
+## Critical Issues
+[List with severity markers, or "None found"]
+
+## Warnings
+[List with severity markers, or "None found"]
+
+## Recommendations
+[Optional improvements]
+```
+
+Your final message to the orchestrator should be MINIMAL:
+```
+[TASK_COMPLETE]
+Summary: [1 sentence verdict]
+Handoff: .parallel/role_[role]_review.md
+```
+```
 
 **Example - Launching a Security Reviewer:**
 
 ```
 Task tool call:
   subagent_type: general-purpose
+  run_in_background: true
   prompt: |
     [Contents of agents/security_agent.md]
 
@@ -130,11 +176,74 @@ Task tool call:
 
     FILES:
     src/api/auth.ts
+
+    ---
+
+    PROGRESS REPORTING:
+    - [CHECKPOINT: READING_CODE]
+    - [CHECKPOINT: ANALYZING]
+    - [CHECKPOINT: WRITING_FINDINGS]
+    - [TASK_COMPLETE] Summary: [1 sentence] Handoff: .parallel/role_security_review.md
+
+    Write detailed findings to `.parallel/role_security_review.md`.
+    Final message should be minimal: [TASK_COMPLETE] Summary: ... Handoff: ...
+```
+
+---
+
+### Step 3.5: Progress Monitoring
+
+Monitor agent progress using tail-based output checking (minimal context approach).
+
+**Monitoring Loop (every 10-15 seconds):**
+
+1. For each running agent:
+   - Use `tail -n 10 <output_file>` via Bash to check recent output
+   - **Do NOT use TaskOutput during monitoring** - it pulls full output into context
+   - Parse for checkpoint markers: `[CHECKPOINT: ...]` or `[TASK_COMPLETE]`
+
+2. Update progress visualization:
+   ```
+   ## Review Progress [HH:MM:SS]
+
+   Security     [████████████████████] 100% - Complete
+   Performance  [████████████░░░░░░░░]  66% - Writing findings
+   Edge Cases   [████░░░░░░░░░░░░░░░░]  33% - Analyzing
+   Maintain.    [░░░░░░░░░░░░░░░░░░░░]   0% - Reading code
+   Testing      [████████████████░░░░]  80% - Writing findings
+   ```
+
+3. Checkpoint-based progress phases:
+
+   | Phase | Progress | Checkpoint Marker |
+   |-------|----------|-------------------|
+   | Reading code | 0% → 33% | `[CHECKPOINT: READING_CODE]` |
+   | Analyzing | 33% → 66% | `[CHECKPOINT: ANALYZING]` |
+   | Writing findings | 66% → 100% | `[CHECKPOINT: WRITING_FINDINGS]` |
+
+4. When all agents show `[TASK_COMPLETE]`:
+   - Use `TaskOutput` with `block=true` to get final minimal message
+   - Extract summary and handoff path from each completed agent
+   - **Do NOT read handoff file contents into orchestrator context**
+
+**Context Efficiency:**
+```
+Orchestrator context (minimal):
+├── Security: complete | "No critical issues found" | .parallel/role_security_review.md
+├── Performance: complete | "2 optimization opportunities" | .parallel/role_performance_review.md
+└── Edge Cases: running | ...
+
+Handoff files (full details, read only for final aggregation):
+├── .parallel/role_security_review.md
+├── .parallel/role_performance_review.md
+└── ...
 ```
 
 ---
 
 ### Step 4: Aggregate by Severity
+
+**Read handoff files** from `.parallel/` to compile findings. This is the only time the orchestrator reads the full output.
 
 Collect all role outputs and organize by severity across all roles:
 
@@ -195,7 +304,17 @@ Collect all role outputs and organize by severity across all roles:
 **Next step:** Say "do it" to apply fixes, or ask about specific findings
 ```
 
-### Step 5: Clean Output Path
+### Step 5: Cleanup
+
+After presenting results to the user:
+
+```bash
+rm -rf .parallel
+```
+
+This removes all temporary handoff files. If the user wants to review detailed role outputs later, they can request to skip cleanup.
+
+### Step 6: Clean Output Path
 
 If a role finds no issues:
 - Don't include empty sections for that role
@@ -255,9 +374,13 @@ When only 1 role completes (due to `--roles` or failures):
 <!-- SYNC: token-efficiency-role -->
 
 1. **Parallel execution**: Launch all role agents in a single message
-2. **Focused prompts**: Each role ignores non-relevant concerns
-3. **Skip empty**: Don't output roles with no findings
-4. **Severity first**: Lead with critical issues, not verbose analysis
+2. **Background execution**: Launch all role agents with `run_in_background=true`
+3. **File-based handoff**: Reviewers write to `.parallel/` files; orchestrator only receives 1-line summaries
+4. **Tail-based monitoring**: Use `tail -n 10` on output files, NOT TaskOutput (avoids pulling full output into context)
+5. **Focused prompts**: Each role ignores non-relevant concerns
+6. **Skip empty**: Don't output roles with no findings
+7. **Severity first**: Lead with critical issues, not verbose analysis
+8. **Cleanup after completion**: Remove `.parallel/` directory after presenting results
 
 ## Deliberation, Not Implementation
 <!-- SYNC: deliberation-disclaimer -->

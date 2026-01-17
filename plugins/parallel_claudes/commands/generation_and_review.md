@@ -104,26 +104,19 @@ Generate the initial solution. This becomes the artifact under review.
 
 ### Step 3: Spawn Parallel Reviewers
 
-**CRITICAL:** Launch all reviewer agents in a SINGLE message with multiple Task tool calls.
+**CRITICAL:** Launch all reviewer agents in a SINGLE message with multiple Task tool calls, using `run_in_background=true` for progress monitoring.
+
+**Setup:**
+1. Create handoff directory: `mkdir -p .parallel`
+2. If `.gitignore` exists and doesn't contain `.parallel`, append `.parallel` to it
 
 **If `--reviewer-roles` is specified:**
 
 Load specialized reviewer agents:
 
 1. For each role, read the agent file from `${CLAUDE_PLUGIN_ROOT}/agents/{role}_agent.md`
-2. Construct the prompt with the agent definition + code:
-   ```
-   [Full content of agents/{role}_agent.md]
-
-   ---
-
-   CODE TO REVIEW:
-   [the generated code or provided code]
-
-   ORIGINAL TASK:
-   [what the code is supposed to accomplish]
-   ```
-3. Launch with `subagent_type=general-purpose`
+2. Construct the prompt with the agent definition + code (see prompt template below)
+3. Launch with `subagent_type=general-purpose` and `run_in_background=true`
 
 Example with `--reviewer-roles security,testing`:
 - Agent 1 loads `security_agent.md` → focuses on vulnerabilities
@@ -131,11 +124,9 @@ Example with `--reviewer-roles security,testing`:
 
 **If `--reviewer-roles` is NOT specified (default):**
 
-Launch N reviewer subagents using the Task tool with `subagent_type=general-purpose`.
+Launch N reviewer subagents using the Task tool with `subagent_type=general-purpose` and `run_in_background=true`.
 
-Each reviewer receives an independent review prompt:
-
-**If --context full (default):**
+**Reviewer Prompt Template (all modes):**
 ```
 You are Reviewer [N] in a parallel code review.
 
@@ -157,26 +148,97 @@ Be specific with line references. Provide severity levels:
 - WARNING: Should fix, potential issues
 - SUGGESTION: Nice to have improvements
 
-Output format:
-### Critical Issues
-[list with line refs]
+PROGRESS REPORTING (output these markers as you work):
+- [CHECKPOINT: READING_CODE]
+- [CHECKPOINT: ANALYZING]
+- [CHECKPOINT: WRITING_REVIEW]
+- [TASK_COMPLETE] Summary: [1 sentence] Handoff: .parallel/reviewer_[N]_review.md
 
-### Warnings
-[list with line refs]
+HANDOFF OUTPUT (CRITICAL - keeps orchestrator context clean):
+Write your detailed review to `.parallel/reviewer_[N]_review.md` in this format:
 
-### Suggestions
-[list with line refs]
+```markdown
+# Reviewer [N] Review
 
-### Overall Assessment
-[1-2 sentence summary]
+## Summary
+[1-2 sentence summary of overall assessment]
+
+## Critical Issues
+[list with line refs and suggested diffs]
+
+## Warnings
+[list with line refs and suggested diffs]
+
+## Suggestions
+[list with line refs]
+```
+
+Your final message to the orchestrator should be MINIMAL:
+```
+[TASK_COMPLETE]
+Summary: [1 sentence verdict - e.g., "Found 2 critical issues in auth handling"]
+Handoff: .parallel/reviewer_[N]_review.md
+```
 ```
 
 **If --context compressed:**
-Send only the code and task, no surrounding conversation context.
+Send only the code and task, no surrounding conversation context (but keep the progress reporting and handoff instructions).
+
+### Step 3.5: Progress Monitoring
+
+Monitor agent progress using tail-based approach (keeps orchestrator context minimal):
+
+**Monitoring Loop (every 10-15 seconds):**
+1. For each running reviewer:
+   - Run `tail -n 10 <output_file>` via Bash to check recent output
+   - **Do NOT use TaskOutput during monitoring** - it pulls full output into context
+   - Parse only for checkpoint markers: `[CHECKPOINT: ...]` or `[TASK_COMPLETE]`
+2. Update TodoWrite with current status
+3. Print progress snapshot
+
+**Progress Snapshot Format:**
+```
+## Review Progress [HH:MM:SS]
+
+Reviewer 1 [████████████████████] 100% - Complete
+Reviewer 2 [████████████░░░░░░░░]  66% - Writing review
+Reviewer 3 [████░░░░░░░░░░░░░░░░]  33% - Analyzing code
+
+Status: 1/3 reviewers complete
+```
+
+**Checkpoint-Based Progress:**
+| Phase | Progress | Checkpoint Marker |
+|-------|----------|-------------------|
+| Reading code | 0% → 33% | `[CHECKPOINT: READING_CODE]` |
+| Analyzing | 33% → 66% | `[CHECKPOINT: ANALYZING]` |
+| Writing review | 66% → 100% | `[CHECKPOINT: WRITING_REVIEW]` |
+
+**Completion Detection:**
+- When all agents show `[TASK_COMPLETE]` in tail output
+- Only then use `TaskOutput` with `block=true` to get final minimal message
+- Extract summary and handoff path from each completed agent
 
 ### Step 4: Aggregate Review Feedback
 
-Collect all reviewer responses and aggregate findings:
+Read review findings from `.parallel/` handoff files (NOT from TaskOutput):
+
+**File-Based Handoff:**
+```
+Orchestrator context (minimal):
+├── Reviewer 1: complete | "Found 2 critical auth issues" | .parallel/reviewer_1_review.md
+├── Reviewer 2: complete | "Clean, minor suggestions" | .parallel/reviewer_2_review.md
+└── Reviewer 3: complete | "Performance concern in loop" | .parallel/reviewer_3_review.md
+
+Handoff files (read for aggregation):
+├── .parallel/reviewer_1_review.md (full review details)
+├── .parallel/reviewer_2_review.md (full review details)
+└── .parallel/reviewer_3_review.md (full review details)
+```
+
+**Aggregation Process:**
+1. Read each `.parallel/reviewer_[N]_review.md` file
+2. Collect all reviewer responses and aggregate findings:
 
 1. **Deduplicate**: Group identical issues found by multiple reviewers
 2. **Note agreement**: Mark issues found by majority as high-confidence
@@ -294,6 +356,16 @@ If reviewers find no significant issues:
 Code looks good! Ready to use as-is.
 ```
 
+### Step 7: Cleanup
+
+After presenting results (regardless of findings), clean up the handoff directory:
+
+```bash
+rm -rf .parallel
+```
+
+This removes temporary review files. If user wants to preserve detailed reviews, mention they can skip cleanup.
+
 ## Error Handling
 
 ### Missing Input
@@ -325,9 +397,13 @@ When only 1 reviewer responds (due to failure or `--count 1`):
 <!-- SYNC: token-efficiency-review -->
 
 1. **Parallel reviewers**: Always launch all Task agents in a single message
-2. **Deduplicate early**: Don't repeat the same issue from multiple reviewers
-3. **Severity triage**: Focus output on CRITICAL and WARNING first
-4. **Skip empty sections**: Don't output "No critical issues" headers, just omit
+2. **Background execution**: Launch all reviewer agents with `run_in_background=true`
+3. **File-based handoff**: Reviewers write to `.parallel/` files; orchestrator only receives 1-line summaries
+4. **Tail-based monitoring**: Use `tail -n 10` on output files during monitoring, NOT TaskOutput (avoids pulling full output into context)
+5. **Deduplicate early**: Don't repeat the same issue from multiple reviewers
+6. **Severity triage**: Focus output on CRITICAL and WARNING first
+7. **Skip empty sections**: Don't output "No critical issues" headers, just omit
+8. **Cleanup after**: Remove `.parallel/` directory after presenting results
 
 ## Deliberation, Not Implementation
 <!-- SYNC: deliberation-disclaimer -->
