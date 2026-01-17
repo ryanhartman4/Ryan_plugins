@@ -87,187 +87,49 @@ Examples:
 
 ### Step 3: Spawn Role-Specialized Reviewers
 
-Launch one subagent per role using the Task tool with `subagent_type=general-purpose`.
+For each selected role, load the agent definition from the `agents/` directory.
 
 **CRITICAL:** Launch all role agents in a SINGLE message with multiple Task tool calls.
 
-Each role receives a specialized prompt:
+**Agent Loading Process:**
 
----
+1. For each role in the selected roles list, read the agent definition file:
+   - `security` → Read `${CLAUDE_PLUGIN_ROOT}/agents/security_agent.md`
+   - `performance` → Read `${CLAUDE_PLUGIN_ROOT}/agents/performance_agent.md`
+   - `edge_cases` → Read `${CLAUDE_PLUGIN_ROOT}/agents/edge_cases_agent.md`
+   - `maintainability` → Read `${CLAUDE_PLUGIN_ROOT}/agents/maintainability_agent.md`
+   - `testing` → Read `${CLAUDE_PLUGIN_ROOT}/agents/testing_agent.md`
 
-**Security Reviewer:**
+2. Construct the prompt for each agent:
+   ```
+   [Full content of the agent definition file]
+
+   ---
+
+   CODE TO REVIEW:
+   [the code being reviewed]
+
+   FILES:
+   [file paths if applicable]
+   ```
+
+3. Launch the Task tool with `subagent_type=general-purpose` for each role agent.
+
+**Example - Launching a Security Reviewer:**
+
 ```
-You are a SECURITY SPECIALIST reviewing code for vulnerabilities.
+Task tool call:
+  subagent_type: general-purpose
+  prompt: |
+    [Contents of agents/security_agent.md]
 
-CODE:
-[code to review]
+    ---
 
-Focus ONLY on security concerns:
-- Injection vulnerabilities (SQL, command, XSS)
-- Authentication/authorization flaws
-- Secrets or credentials in code
-- Insecure data handling
-- OWASP Top 10 vulnerabilities
-- Cryptographic weaknesses
+    CODE TO REVIEW:
+    [code snippet or file contents]
 
-Ignore style, performance, or other non-security issues.
-
-Output format:
-### Security Findings
-
-#### CRITICAL (Exploitable)
-- [vulnerability]: [description, line ref, exploitation scenario]
-
-#### WARNING (Potential Risk)
-- [issue]: [description, line ref, risk level]
-
-#### RECOMMENDATION
-- [hardening suggestion]
-
-### Security Verdict
-[SECURE / NEEDS ATTENTION / VULNERABLE]
-```
-
----
-
-**Performance Reviewer:**
-```
-You are a PERFORMANCE SPECIALIST reviewing code for efficiency.
-
-CODE:
-[code to review]
-
-Focus ONLY on performance concerns:
-- Algorithmic complexity (Big O)
-- Unnecessary iterations or allocations
-- Memory leaks or retention
-- Caching opportunities missed
-- Database query efficiency
-- Async/blocking issues
-
-Ignore security, style, or functional correctness.
-
-Output format:
-### Performance Findings
-
-#### CRITICAL (Major Impact)
-- [issue]: [description, line ref, complexity/impact]
-
-#### WARNING (Moderate Impact)
-- [issue]: [description, line ref, suggested optimization]
-
-#### OPTIMIZATION OPPORTUNITIES
-- [suggestion]
-
-### Performance Verdict
-[OPTIMAL / ACCEPTABLE / NEEDS OPTIMIZATION]
-```
-
----
-
-**Edge Cases Reviewer:**
-```
-You are an EDGE CASE SPECIALIST reviewing code for robustness.
-
-CODE:
-[code to review]
-
-Focus ONLY on edge cases and error handling:
-- Null/undefined handling
-- Empty arrays/strings/objects
-- Boundary conditions (0, -1, MAX_INT)
-- Error propagation paths
-- Race conditions
-- Timeout scenarios
-- Invalid input handling
-
-Ignore security, performance, or style.
-
-Output format:
-### Edge Case Findings
-
-#### CRITICAL (Will Crash/Fail)
-- [case]: [description, line ref, failure scenario]
-
-#### WARNING (May Fail)
-- [case]: [description, line ref, condition]
-
-#### MISSING HANDLING
-- [edge case not covered]
-
-### Robustness Verdict
-[ROBUST / MOSTLY ROBUST / FRAGILE]
-```
-
----
-
-**Maintainability Reviewer:**
-```
-You are a MAINTAINABILITY SPECIALIST reviewing code quality.
-
-CODE:
-[code to review]
-
-Focus ONLY on maintainability concerns:
-- SOLID principle violations
-- Tight coupling between components
-- Unclear or misleading names
-- Missing or excessive abstractions
-- Code duplication
-- Complex conditionals
-- Magic numbers/strings
-
-Ignore security, performance, or edge cases.
-
-Output format:
-### Maintainability Findings
-
-#### CRITICAL (Hard to Maintain)
-- [issue]: [description, line ref, maintenance burden]
-
-#### WARNING (Could Be Cleaner)
-- [issue]: [description, line ref, suggestion]
-
-#### REFACTORING OPPORTUNITIES
-- [improvement suggestion]
-
-### Maintainability Verdict
-[CLEAN / ACCEPTABLE / NEEDS REFACTORING]
-```
-
----
-
-**Testing Reviewer:**
-```
-You are a TESTING SPECIALIST reviewing code for testability.
-
-CODE:
-[code to review]
-
-Focus ONLY on testing concerns:
-- Test coverage gaps (what's not tested?)
-- Hard-to-test code patterns
-- Missing dependency injection
-- Assertions that should exist
-- Mocking difficulties
-- Integration test needs
-
-Ignore security, performance, or style.
-
-Output format:
-### Testing Findings
-
-#### CRITICAL (Untestable)
-- [issue]: [description, line ref, testing barrier]
-
-#### WARNING (Hard to Test)
-- [issue]: [description, line ref, suggestion]
-
-#### TEST RECOMMENDATIONS
-- [specific test case to add]
-
-### Testing Verdict
-[WELL-TESTED / NEEDS TESTS / UNTESTABLE]
+    FILES:
+    src/api/auth.ts
 ```
 
 ---

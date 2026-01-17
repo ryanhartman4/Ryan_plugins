@@ -15,6 +15,9 @@ The user's coding task/prompt follows the skill invocation.
 - `--model <model>`: Model for all instances (sonnet, opus, haiku)
 - `--conflict <mode>`: Resolution mode - `majority_vote` (default), `show_all`, `debate`
 - `--context <mode>`: Context strategy - `compressed` (default), `full`
+- `--roles <list>`: Specialized agent perspectives (e.g., `security,performance`)
+
+**Note on `--roles`:** When specified, each role spawns one agent with that specialized perspective. This overrides `--count`. Use for getting diverse expert viewpoints on the same task. See `${CLAUDE_PLUGIN_ROOT}/agents/` for available roles.
 
 ## Input Validation
 
@@ -28,6 +31,18 @@ Before executing, validate all flags and show configuration:
 | `--model` | sonnet, opus, haiku | sonnet | Warn and use default |
 | `--conflict` | majority_vote, show_all, debate | majority_vote | Warn and use default |
 | `--context` | compressed, full | compressed | Warn and use default |
+| `--roles` | security, performance, edge_cases, maintainability, testing | (none) | Skip invalid roles with warning |
+
+**`--roles` Validation:**
+- Parse comma-separated roles
+- Validate each against available agents in `${CLAUDE_PLUGIN_ROOT}/agents/`
+- Invalid roles: Skip with warning "Unknown role: [value]. Skipping."
+- If `--roles` specified, `--count` is ignored (one agent per role)
+
+**`--roles` Fallback Behavior:**
+- If `--roles` is specified but empty: Warn and fall back to `--count` generic agents
+- If all specified roles are invalid: Warn and fall back to `--count` generic agents
+- Message: "No valid roles specified. Falling back to [N] generic agents."
 
 ### Error Messages
 
@@ -35,7 +50,7 @@ Before executing, validate all flags and show configuration:
 Invalid --count: [value]. Must be 2-7. Using default (3).
 Invalid --model: [value]. Valid options: sonnet, opus, haiku. Using default (sonnet).
 Invalid --conflict: [value]. Valid options: majority_vote, show_all, debate. Using default (majority_vote).
-Invalid --context: [value]. Valid options: full, compressed. Using default (full).
+Invalid --context: [value]. Valid options: full, compressed. Using default (compressed).
 ```
 
 ### Configuration Display
@@ -69,9 +84,44 @@ For trivial tasks (single function, <20 lines, no algorithmic complexity), skip 
 
 ### Step 3: Spawn Parallel Claude Instances
 
-Launch N Claude subagents using the Task tool with `subagent_type=general-purpose`.
-
 **CRITICAL:** Launch all agents in a SINGLE message with multiple Task tool calls to ensure true parallel execution.
+
+**If `--roles` is specified:**
+
+Load specialized agent definitions and spawn one agent per role:
+
+1. For each role, read the agent file from `${CLAUDE_PLUGIN_ROOT}/agents/{role}_agent.md`
+2. Construct the prompt with the agent definition + task + mode override:
+   ```
+   [Full content of agents/{role}_agent.md]
+
+   ---
+
+   **MODE: GENERATION (not review)**
+
+   You are using your specialized expertise to GENERATE CODE, not review existing code.
+
+   TASK: [user's coding task]
+
+   Apply your domain expertise to implement this task:
+   - Security agents: Focus on secure coding patterns, input validation, auth best practices
+   - Performance agents: Focus on efficient algorithms, minimal allocations, caching strategies
+   - Edge cases agents: Focus on robust error handling, defensive coding, boundary checks
+   - Maintainability agents: Focus on clean architecture, clear naming, SOLID principles
+   - Testing agents: Focus on testable structure, dependency injection, clear interfaces
+
+   Output a complete code solution with brief notes on how your specialization influenced the implementation.
+   Do NOT output CRITICAL/WARNING/SUGGESTION sections or verdicts.
+   ```
+3. Launch with `subagent_type=general-purpose`
+
+Example with `--roles security,performance`:
+- Agent 1 loads `security_agent.md` → implements with security-first thinking
+- Agent 2 loads `performance_agent.md` → implements with performance-first thinking
+
+**If `--roles` is NOT specified (default):**
+
+Launch N generic Claude subagents using the Task tool with `subagent_type=general-purpose`.
 
 For each agent, provide a focused prompt based on context mode:
 
@@ -288,3 +338,9 @@ This separation ensures you see the reasoning and can modify the approach before
 ```
 /parallel_generation --context compressed refactor the payment processing module
 ```
+
+**Specialized perspectives with --roles:**
+```
+/parallel_generation --roles security,performance implement API authentication
+```
+This spawns two agents: one approaching the task with security-first thinking (input validation, token security, etc.) and one with performance-first thinking (caching, efficient lookups, etc.). Great for getting diverse expert viewpoints on the same implementation.

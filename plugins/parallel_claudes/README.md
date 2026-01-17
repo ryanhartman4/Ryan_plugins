@@ -13,7 +13,8 @@ Add this plugin directory to your Claude Code settings, then start using the com
 
 - Spawns multiple Claude instances in parallel for independent code generation
 - Applies confidence voting and synthesis to merge solutions
-- Provides specialized role-based review from security, performance, and maintainability perspectives
+- Provides specialized role-based review from five expert perspectives (security, performance, edge cases, maintainability, testing)
+- Uses formalized agent definitions for consistent, expert-level analysis
 
 ## How it Works
 
@@ -28,6 +29,49 @@ Add this plugin directory to your Claude Code settings, then start using the com
 - **Prevents context overload**: Fresh Claude instances avoid "cutting corners" from accumulated context
 - **Majority voting**: 3+ independent perspectives catch blind spots better than a single run
 - **Specialized expertise**: Role-based reviews provide focused, expert-level feedback
+
+## Specialized Agents
+
+This plugin includes formalized agent definitions in the `agents/` directory. Each agent is an expert in a specific domain:
+
+| Agent | File | Focus |
+|-------|------|-------|
+| Security | `agents/security_agent.md` | Vulnerabilities, OWASP Top 10, injection attacks |
+| Performance | `agents/performance_agent.md` | Algorithmic complexity, memory, caching |
+| Edge Cases | `agents/edge_cases_agent.md` | Null handling, boundaries, error paths |
+| Maintainability | `agents/maintainability_agent.md` | SOLID principles, coupling, clarity |
+| Testing | `agents/testing_agent.md` | Coverage gaps, testability, mocking |
+
+### Using Specialized Agents
+
+**In role_based_review** (default behavior):
+```
+/parallel_claudes:role_based_review src/api/auth.ts
+# Uses all 5 specialized agents automatically
+
+/parallel_claudes:role_based_review --roles security,testing src/api/auth.ts
+# Uses only security and testing agents
+```
+
+**In parallel_generation** (new `--roles` flag):
+```
+/parallel_claudes:parallel_generation --roles security,performance implement rate limiting
+# Spawns agents with security-first and performance-first perspectives
+```
+
+**In generation_and_review** (new `--reviewer-roles` flag):
+```
+/parallel_claudes:generation_and_review --reviewer-roles security,testing implement auth
+# Uses specialized reviewers instead of generic ones
+```
+
+**In swarm** (per-task agent assignment):
+```
+/parallel_claudes:swarm add user auth with security review
+# Task breakdown can assign security, testing agents to specific tasks
+```
+
+See `agents/README.md` for full documentation.
 
 ## Commands
 
@@ -49,6 +93,7 @@ Run multiple Claude instances in parallel on the same task, then apply confidenc
 - `--model <model>`: Model for all instances — `sonnet`, `opus`, `haiku` (default: sonnet)
 - `--conflict <mode>`: `majority_vote` (default), `show_all`, `debate`
 - `--context <mode>`: `compressed` (default), `full`
+- `--roles <list>`: Specialized agent perspectives (e.g., `security,performance`) — overrides `--count`
 
 **Example:**
 ```
@@ -76,6 +121,7 @@ One Claude generates a solution, then multiple Claudes review it in parallel for
 - `--model <model>`: Model — `sonnet`, `opus`, `haiku` (default: sonnet)
 - `--conflict <mode>`: `majority_vote` (default), `show_all`, `debate`
 - `--context <mode>`: `compressed` (default), `full`
+- `--reviewer-roles <list>`: Specialized reviewer agents (e.g., `security,testing`) — overrides `--count`
 
 **Example:**
 ```

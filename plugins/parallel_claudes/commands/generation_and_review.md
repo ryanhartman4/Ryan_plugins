@@ -17,6 +17,9 @@ The user provides either:
 - `--model <model>`: Model for all instances (sonnet, opus, haiku)
 - `--conflict <mode>`: Resolution mode - `majority_vote` (default), `show_all`, `debate`
 - `--context <mode>`: Context strategy - `compressed` (default), `full`
+- `--reviewer-roles <list>`: Specialized reviewer agents (e.g., `security,testing`)
+
+**Note on `--reviewer-roles`:** When specified, uses specialized agent definitions instead of generic reviewers. Each role spawns one focused reviewer. This overrides `--count`. See `${CLAUDE_PLUGIN_ROOT}/agents/` for available roles.
 
 ## Input Validation
 
@@ -30,8 +33,21 @@ Before executing, validate all flags and show configuration:
 | `--model` | sonnet, opus, haiku | sonnet | Warn and use default |
 | `--conflict` | majority_vote, show_all, debate | majority_vote | Warn and use default |
 | `--context` | compressed, full | compressed | Warn and use default |
+| `--reviewer-roles` | security, performance, edge_cases, maintainability, testing | (none) | Skip invalid roles with warning |
 
-**Note:** `--count 1` is valid for reviews (single reviewer) but provides no cross-validation benefit. Recommend 2+ for confidence.
+**Notes:**
+- `--count 1` is valid for reviews (single reviewer) but provides no cross-validation benefit. Recommend 2+ for confidence.
+- If `--reviewer-roles` is specified, `--count` is ignored (one reviewer per role).
+
+**`--reviewer-roles` Validation:**
+- Parse comma-separated roles
+- Validate each against available agents in `${CLAUDE_PLUGIN_ROOT}/agents/`
+- Invalid roles: Skip with warning "Unknown role: [value]. Skipping."
+
+**`--reviewer-roles` Fallback Behavior:**
+- If `--reviewer-roles` is specified but empty: Warn and fall back to `--count` generic reviewers
+- If all specified roles are invalid: Warn and fall back to `--count` generic reviewers
+- Message: "No valid reviewer roles specified. Falling back to [N] generic reviewers."
 
 ### Error Messages
 
@@ -39,7 +55,7 @@ Before executing, validate all flags and show configuration:
 Invalid --count: [value]. Must be 1-7. Using default (3).
 Invalid --model: [value]. Valid options: sonnet, opus, haiku. Using default (sonnet).
 Invalid --conflict: [value]. Valid options: majority_vote, show_all, debate. Using default (majority_vote).
-Invalid --context: [value]. Valid options: full, compressed. Using default (full).
+Invalid --context: [value]. Valid options: full, compressed. Using default (compressed).
 ```
 
 ### Configuration Display
@@ -88,9 +104,34 @@ Generate the initial solution. This becomes the artifact under review.
 
 ### Step 3: Spawn Parallel Reviewers
 
-Launch N reviewer subagents using the Task tool with `subagent_type=general-purpose`.
-
 **CRITICAL:** Launch all reviewer agents in a SINGLE message with multiple Task tool calls.
+
+**If `--reviewer-roles` is specified:**
+
+Load specialized reviewer agents:
+
+1. For each role, read the agent file from `${CLAUDE_PLUGIN_ROOT}/agents/{role}_agent.md`
+2. Construct the prompt with the agent definition + code:
+   ```
+   [Full content of agents/{role}_agent.md]
+
+   ---
+
+   CODE TO REVIEW:
+   [the generated code or provided code]
+
+   ORIGINAL TASK:
+   [what the code is supposed to accomplish]
+   ```
+3. Launch with `subagent_type=general-purpose`
+
+Example with `--reviewer-roles security,testing`:
+- Agent 1 loads `security_agent.md` → focuses on vulnerabilities
+- Agent 2 loads `testing_agent.md` → focuses on testability
+
+**If `--reviewer-roles` is NOT specified (default):**
+
+Launch N reviewer subagents using the Task tool with `subagent_type=general-purpose`.
 
 Each reviewer receives an independent review prompt:
 
@@ -319,3 +360,9 @@ This command is a **deliberation phase**—it presents proposed fixes but does n
 ```
 /generation_and_review --conflict show_all src/api/payments.ts
 ```
+
+**Specialized reviewers with --reviewer-roles:**
+```
+/generation_and_review --reviewer-roles security,testing implement user registration
+```
+This generates the code, then spawns two specialized reviewers: a security specialist (checking for vulnerabilities) and a testing specialist (checking for testability). Great when you want focused expert review instead of generic review.
