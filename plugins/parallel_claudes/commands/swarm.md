@@ -40,7 +40,7 @@ Before executing, validate all flags:
 ```
 Invalid --count: [value]. Must be 2-7. Using default (5).
 Invalid --model: [value]. Valid options: sonnet, opus, haiku. Using default (sonnet).
-Invalid --context: [value]. Valid options: full, compressed. Using default (full).
+Invalid --context: [value]. Valid options: full, compressed. Using default (compressed).
 ```
 
 ### Configuration Display
@@ -84,11 +84,11 @@ Analyze the task and break it into sub-tasks following MECE principles:
 **Task Types - Implementation vs Research:**
 When decomposing, identify each task's type:
 - **Implementation tasks**: Output is files created/modified. Downstream tasks can read those files directly.
-- **Research tasks**: Output is findings/analysis text. Downstream tasks need the actual text output passed to them.
+- **Research tasks**: Output is findings/analysis text. Agent writes findings to `.swarm/task_{N}_findings.md`; downstream tasks read that file directly.
 
 For research tasks that feed into later waves, consider:
 - Is the research actually needed, or can the implementation task do its own quick exploration?
-- If research IS needed, ensure you'll extract and pass the full findings (see Step 5)
+- Research findings are written to handoff files, so downstream tasks read them directly (not through orchestrator)
 - For small codebases (<20 files), parallel research may add overhead without value—one agent can explore quickly
 
 **When NOT to decompose:**
@@ -150,14 +150,16 @@ AskUserQuestion with:
 - **Modify**: User can request changes to the decomposition (including agent types)
 - **Abort**: Cancel swarm
 
-### Step 4: Permission Warmup
+### Step 4: Setup & Permission Warmup
 
-Background agents cannot prompt for permissions interactively. Before launching agents, grant Edit permissions by making a minimal no-op edit to representative files.
+Background agents cannot prompt for permissions interactively. Before launching agents, create the handoff directory and grant Edit permissions.
 
 **Process:**
-1. Identify unique directories from the task breakdown's file list
-2. For each directory, select one existing file that will be modified
-3. Display explanation to user:
+1. **Create handoff directory**: Run `mkdir -p .swarm` to create the handoff file directory
+   - If `.gitignore` exists and doesn't contain `.swarm`, append `.swarm` to it (prevents accidental commits of temp files)
+2. Identify unique directories from the task breakdown's file list
+3. For each directory, select one existing file that will be modified
+4. Display explanation to user:
    ```
    ## Permission Warmup
 
@@ -169,8 +171,8 @@ Background agents cannot prompt for permissions interactively. Before launching 
    **Important:** When prompted, select "Always allow" or "Allow all edits" to grant
    permission for the entire session. This allows background agents to write files.
    ```
-4. For each file, make a trivial edit (add a trailing newline, then remove it) using the Edit tool
-5. The user selecting "Always allow" grants Edit permission to background agents for the session
+5. For each file, make a trivial edit (add a trailing newline, then remove it) using the Edit tool
+6. The user selecting "Always allow" grants Edit permission to background agents for the session
 
 **Note:** If all tasks only create new files (no modifications), this step can be skipped since Write permissions for new files don't require warmup.
 
@@ -185,67 +187,91 @@ For each wave:
 
 2. **Launch agents**: In a SINGLE message, launch all wave tasks using Task tool with `subagent_type` set to each task's configured agent type (default: `general-purpose`)
 
-3. **Progress monitoring loop** (every 10-15 seconds):
-   - Use `TaskOutput` with `block=false` to check each agent
-   - Parse output for checkpoint markers
+3. **Progress monitoring loop** (every 10-15 seconds) — **MINIMAL CONTEXT**:
+   - Use `tail -n 10 <output_file>` (via Bash) to check each agent's recent output
+   - **Do NOT use TaskOutput during monitoring**—it pulls full output into context
+   - Parse only for checkpoint markers: `[CHECKPOINT: ...]` or `[TASK_COMPLETE]`
    - Update TodoWrite with current status
    - Print progress snapshot (see Progress Visualization below)
 
 4. **Wave completion**: Wait for all wave agents to complete before starting next wave
+   - Detect completion by seeing `[TASK_COMPLETE]` in tail output
+   - Only then use `TaskOutput` with `block=true` to get the final minimal message
 
-5. **Extract outputs for dependent tasks**: Before launching the next wave, extract actual outputs from completed agents:
-   - Use `TaskOutput` with `block=true` to get final output from each completed agent
-   - For **implementation tasks**: Note which files were created/modified (the files ARE the output)
-   - For **research/exploration tasks**: Extract the agent's findings text—this IS the valuable output that must be passed forward
-   - Store these outputs to include in dependent task prompts
+5. **Track completion (minimal context)**: The orchestrator only tracks task status and handoff file paths:
+   - Parse the minimal completion message: `[TASK_COMPLETE] Summary: ... Handoff: .swarm/task_{N}_output.md`
+   - **Do NOT read handoff file contents**—dependent tasks read them directly
+   - Store only: `{task_id, status, summary (1 sentence), handoff_path}`
 
-**CRITICAL - Research Task Output Handling:**
-When Wave N contains research/exploration tasks (mapping, analysis, investigation), their text output contains the findings. You MUST:
-1. Read the full output from each research agent (not just check completion status)
-2. Extract key findings, not just write your own 1-sentence summary
-3. Include substantive excerpts or the full findings in Wave N+1 prompts
+**File-Based Handoff (Context Efficiency):**
+ALL task outputs flow through handoff files, NOT through the orchestrator's context. This prevents context bloat:
 
-**Anti-pattern to avoid:**
 ```
-❌ BAD: "Task 1 mapped the auth module" (your summary, not the agent's findings)
-✅ GOOD: Include actual output: "Task 1 findings: [paste agent's analysis here]"
+Orchestrator context (minimal):
+├── Task 1: complete | "Created User model" | .swarm/task_1_output.md
+├── Task 2: complete | "Added auth routes" | .swarm/task_2_output.md
+└── Task 3: running  | ...
+
+Handoff files (full details, read by dependent tasks):
+├── .swarm/task_1_output.md  (full reasoning, file changes, notes)
+├── .swarm/task_2_output.md  (full reasoning, file changes, notes)
+└── ...
 ```
 
-If you summarize instead of passing actual output, Wave N was wasted—Wave N+1 will just redo the work.
+- Orchestrator receives: 1-sentence summary + file path
+- Dependent tasks read: Full handoff files directly via Read tool
+- Result: Orchestrator context stays clean regardless of task count
 
 **Agent Prompt Template:**
 ```
 You are executing Task [N] of a swarm operation.
 
 TASK: [description]
+TASK TYPE: [implementation | research]
 
-DEPENDENCIES AND THEIR OUTPUTS:
+DEPENDENCIES (read these files first):
+[For each dependency, list the handoff file to read:]
+- Task [X]: Read `.swarm/task_[X]_output.md`
 
-[For each dependency task, include ONE of the following based on task type:]
+HANDOFF OUTPUT (CRITICAL - keeps orchestrator context clean):
+Write ALL your detailed output to `.swarm/task_[N]_output.md`:
 
-[If dependency was an IMPLEMENTATION task:]
-- Task [X] created/modified these files: [file list]
-  You can read these files directly.
+```markdown
+# Task [N] Output
 
-[If dependency was a RESEARCH/EXPLORATION task:]
-- Task [X] findings:
-  """
-  [Paste the actual output/findings from that agent here - not your summary]
-  """
+## Summary
+[1-2 sentence summary of what was accomplished]
+
+## Files Changed
+- [file1]: [brief description]
+- [file2]: [brief description]
+
+## Details
+[Full reasoning, decisions made, implementation notes]
+[For research: complete findings and analysis]
+[For implementation: approach taken, edge cases handled, etc.]
+```
+
+Your final message to the orchestrator should be MINIMAL:
+```
+[TASK_COMPLETE]
+Summary: [1 sentence]
+Handoff: .swarm/task_[N]_output.md
+```
 
 CONSTRAINTS:
 - Focus ONLY on this specific task
 - Your file scope: [list of files you may create/modify]
 - Do not modify files outside your scope
 - Apply changes directly - this is an execution task, not review
-- Use the dependency outputs above—don't redo research that was already done
+- Read dependency handoff files—don't redo research that was already done
+- Write detailed output to handoff file, NOT to orchestrator
 
-PROGRESS REPORTING (required):
-Output these markers as you work:
-- [CHECKPOINT: READ_FILES] - before reading any files
-- [CHECKPOINT: PLAN_CHANGES] - after reading, before making changes
-- [CHECKPOINT: APPLY_CHANGES] - when applying changes
-- [TASK_COMPLETE] - when finished
+PROGRESS REPORTING (minimal markers only):
+- [CHECKPOINT: READ_FILES]
+- [CHECKPOINT: PLAN_CHANGES]
+- [CHECKPOINT: APPLY_CHANGES]
+- [TASK_COMPLETE] Summary: [1 sentence] Handoff: .swarm/task_[N]_output.md
 
 Execute the task now.
 ```
@@ -282,10 +308,11 @@ If a task fails:
 3. Wait for user decision via AskUserQuestion
 4. Execute chosen option
 
-### Step 8: Summary & Verification
+### Step 8: Summary, Verification & Cleanup
 
 After all waves complete:
 
+1. **Display summary** (compile from stored task summaries, NOT by reading handoff files):
 ```
 ## Swarm Complete
 
@@ -309,7 +336,13 @@ Would you like to:
 3. Done - no verification needed
 ```
 
-Use AskUserQuestion to present these options.
+2. **Use AskUserQuestion** to present these options.
+
+3. **Cleanup handoff directory**: After user confirms completion:
+   ```bash
+   rm -rf .swarm
+   ```
+   This removes all temporary handoff files. If the user wants to review detailed task outputs later, mention they can skip cleanup, but by default clean up to avoid clutter.
 
 ## Progress Visualization
 
@@ -360,13 +393,17 @@ The `activeForm` field shows current phase (e.g., "Planning changes for validati
 2. Store output_file paths for each agent
 3. Loop every 10-15 seconds:
    a. For each running agent:
-      - TaskOutput with block=false, timeout=1000
-      - Parse output for [CHECKPOINT: *] markers
+      - Bash: tail -n 10 <output_file>  ← MINIMAL context, just last 10 lines
+      - Parse for [CHECKPOINT: *] markers
       - Parse for [TASK_COMPLETE] marker
+      - Do NOT use TaskOutput during monitoring (pulls full output)
    b. Update TodoWrite with current statuses
    c. Print progress snapshot
-   d. Check if wave is complete
-4. When wave completes, start next wave
+   d. Check if wave is complete (all agents show [TASK_COMPLETE])
+4. When wave completes:
+   a. Use TaskOutput with block=true to get final message (should be minimal)
+   b. Extract summary and handoff path from each completed agent
+   c. Start next wave
 5. Print final summary when all waves done
 ```
 
@@ -401,12 +438,39 @@ By default, all tasks use `general-purpose` agents. However, you can leverage sp
 
 ### Available Specialized Agents
 
-| Agent Type | Best For | Example Use |
-|------------|----------|-------------|
-| `general-purpose` | Most implementation tasks | Creating files, writing code |
-| `feature-dev:code-reviewer` | Code review tasks | Security audit of new auth code |
-| `Explore` | Research/discovery tasks | Finding related files before modification |
-| `Plan` | Architecture decisions | Designing component structure |
+| Agent Type | Best For | Agent File |
+|------------|----------|------------|
+| `general-purpose` | Most implementation tasks | (Anthropic built-in) |
+| `security` | Security-focused implementation | `${CLAUDE_PLUGIN_ROOT}/agents/security_agent.md` |
+| `performance` | Performance-optimized code | `${CLAUDE_PLUGIN_ROOT}/agents/performance_agent.md` |
+| `edge_cases` | Robust error handling | `${CLAUDE_PLUGIN_ROOT}/agents/edge_cases_agent.md` |
+| `maintainability` | Clean code focus | `${CLAUDE_PLUGIN_ROOT}/agents/maintainability_agent.md` |
+| `testing` | Test writing tasks | `${CLAUDE_PLUGIN_ROOT}/agents/testing_agent.md` |
+| `Explore` | Research/discovery tasks | (Anthropic built-in) |
+| `Plan` | Architecture decisions | (Anthropic built-in) |
+
+**Note:** External plugin agents (e.g., `feature-dev:code-reviewer`) can also be used if those plugins are installed.
+
+### Local Agent Integration
+
+When a task specifies a local agent type (security, performance, etc.):
+
+1. Read the agent definition from `${CLAUDE_PLUGIN_ROOT}/agents/{type}_agent.md`
+2. Include the full agent definition in the task prompt
+3. **Add mode override for implementation tasks:**
+   ```
+   **MODE: IMPLEMENTATION (not review)**
+
+   Apply your specialized expertise to implement this task. Focus on:
+   - [security]: Secure coding practices, input validation, auth patterns
+   - [performance]: Efficient algorithms, minimal allocations, caching
+   - [edge_cases]: Robust error handling, defensive coding, boundary checks
+   - [maintainability]: Clean architecture, clear naming, SOLID principles
+   - [testing]: Testable structure, dependency injection, clear interfaces
+
+   Output working code, not review findings. Do NOT output CRITICAL/WARNING/SUGGESTION sections.
+   ```
+4. Launch with `subagent_type=general-purpose` (the agent definition + mode override shapes behavior)
 
 ### How Agent Types Are Assigned
 
@@ -431,14 +495,16 @@ By default, all tasks use `general-purpose` agents. However, you can leverage sp
 - [1] Create User model
   Agent: general-purpose
 - [2] Create auth routes
-  Agent: general-purpose
+  Agent: security ← Uses security_agent.md for security-focused implementation
 
 ### Wave 2
 - [3] Security review of auth implementation (depends on: 1, 2)
-  Agent: feature-dev:code-reviewer ← Will you approve this specialized agent?
+  Agent: security ← Uses security_agent.md for vulnerability analysis
 - [4] Write tests (depends on: 1, 2)
-  Agent: general-purpose
+  Agent: testing ← Uses testing_agent.md for test writing
 ```
+
+When a task uses a local agent (security, performance, etc.), the agent file is loaded and included in the task prompt, giving the agent specialized instructions and focus areas.
 
 ## Token Efficiency Rules
 <!-- SYNC: token-efficiency-swarm -->
@@ -446,8 +512,10 @@ By default, all tasks use `general-purpose` agents. However, you can leverage sp
 1. **Parallel agent launch**: Launch all wave agents in ONE message
 2. **Compressed context option**: Use `--context compressed` for independent tasks
 3. **Skip trivial tasks**: Don't swarm tasks under 20 lines
-4. **Efficient monitoring**: Use non-blocking TaskOutput checks
-5. **Scope constraints**: Each agent only reads/writes files in its scope
+4. **Tail-based monitoring**: Use `tail -n 10` on output files, NOT TaskOutput (avoids pulling full output)
+5. **File-based handoff**: Agents write to `.swarm/` files; orchestrator only receives 1-line summaries
+6. **Direct dependency reads**: Dependent tasks read handoff files directly, not through orchestrator
+7. **Scope constraints**: Each agent only reads/writes files in its scope
 
 ## Execution, Not Deliberation
 <!-- SYNC: execution-disclaimer -->
