@@ -6,7 +6,7 @@ Orchestrate multiple AI models (Claude + Codex) for higher quality code generati
 
 **Step 1:** Add the marketplace
 ```
-/plugin marketplace add kingbootoshi/claude-plugins
+/plugin marketplace add ryanhartman4/Ryan_plugins
 ```
 
 **Step 2:** Install the plugin

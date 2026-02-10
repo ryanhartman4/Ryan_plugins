@@ -1,0 +1,9 @@
+{
+  "name": "pass_off",
+  "description": "Create handoff documents to capture current work state for session transitions",
+  "version": "1.0.0",
+  "author": {
+    "name": "Ryan Hartman",
+    "email": "ryan@theryanhartman.com"
+  }
+}

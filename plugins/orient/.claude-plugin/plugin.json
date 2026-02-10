@@ -1,0 +1,9 @@
+{
+  "name": "orient",
+  "description": "Orient yourself to unfamiliar codebases by reading docs, exploring structure, and loading project skills",
+  "version": "1.0.0",
+  "author": {
+    "name": "Ryan Hartman",
+    "email": "ryan@theryanhartman.com"
+  }
+}

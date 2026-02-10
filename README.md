@@ -2,56 +2,35 @@
 
 Personal plugin marketplace for Claude Code.
 
-## Why Multi-Model Orchestration?
+## Installation
 
-A single AI pass can have blind spots. These plugins address that by bringing multiple perspectives to your code:
+Install individual plugins directly from GitHub:
 
-- **Catch more issues**: Different models or instances often spot different problems—one might catch a security flaw while another notices a performance bottleneck
-- **Reduce overconfidence**: When multiple perspectives agree, you can trust the solution more; when they disagree, you know to look closer
-- **Fresh eyes**: Spawning new instances avoids the "context fatigue" where a model starts cutting corners after long conversations
+```bash
+# Install a specific plugin
+claude plugin add ryanhartman4/Ryan_plugins/plugins/orient
+claude plugin add ryanhartman4/Ryan_plugins/plugins/pass_off
+claude plugin add ryanhartman4/Ryan_plugins/plugins/parallel_claudes
+claude plugin add ryanhartman4/Ryan_plugins/plugins/council
+```
 
-## Deliberation-First Philosophy
-
-These plugins are **thinking tools**, not auto-coders. Most commands follow a deliberation → implementation pattern:
-
-1. Multiple models discuss, compare approaches, and reach consensus
-2. You review the proposed solution and reasoning
-3. You decide whether to implement (say "do it" or enter plan mode)
-
-This keeps you in control. You see the "why" before any code changes, and you can reject or modify the consensus before anything touches your codebase.
-
-**Exception:** `swarm` executes immediately after you approve the task breakdown—it's designed for complex multi-part tasks where you want parallel execution, not deliberation.
-
-> [!CAUTION]
-> **The `swarm` command breaks the deliberation-first pattern.** Unlike other commands that let you review before changes happen, swarm spawns multiple Claude instances that execute tasks immediately and in parallel. Once approved, sub-tasks run without further confirmation. Use with care:
-> - Review the task breakdown carefully before approving
-> - Ensure your git state is clean so you can revert if needed
-> - Consider using on a branch rather than main
-
-## Choosing a Plugin
-
-| If you want... | Use |
-|----------------|-----|
-| Claude + Codex diversity (two different models) | **council** |
-| Multiple Claude perspectives (no external deps) | **parallel_claudes** |
-| Configurable instance count (2-7) | **parallel_claudes** |
-| Role-based expert reviews (security, perf, etc.) | **parallel_claudes** |
-| Quick second opinion from Codex | **council** (`council_simple_review`) |
-| Execute complex multi-part tasks in parallel | **parallel_claudes** (`swarm`) |
-
-**Note**: Council requires Codex CLI installed. Parallel Claudes works with Claude alone.
-
----
+After installing, the plugin's commands are available immediately via `/plugin_name:command_name`.
 
 ## Plugins
 
-### council
-Council of LLMs - orchestrate multiple AI models (Claude + Codex) for higher quality code generation.
+### orient
+Orient yourself to an unfamiliar codebase. Reads documentation, explores project structure with an Explore agent, and checks for project-specific skills — so you start every session with full context.
 
 Commands:
-- `/council:council_parallel` - Run Claude and Codex in parallel with confidence voting
-- `/council:council_review` - One model generates, the other reviews with debate
-- `/council:council_simple_review` - Quick code review by Codex
+- `/orient:orient` - Run the full orientation workflow
+
+### pass_off
+Create handoff documents that capture your current work state for session transitions. Gathers git status, recent changes, in-progress tasks, and generates a timestamped markdown file so the next session (or person) can pick up where you left off.
+
+Commands:
+- `/pass_off:pass_off` - Generate a handoff document
+
+---
 
 ### parallel_claudes
 Orchestrate multiple Claude instances for parallel generation, review, and specialized role-based analysis.
@@ -62,4 +41,43 @@ Commands:
 - `/parallel_claudes:role_based_review` - Specialized reviewers (security, performance, edge cases, etc.)
 - `/parallel_claudes:swarm` - Break down complex tasks into MECE (non-overlapping, complete coverage) sub-tasks and execute in parallel waves
 
-**Ideal workflow for complex features:** `parallel_generation` (deliberate on design) → `swarm` (parallel execution) → `role_based_review` (verify changes)
+> [!NOTE]
+> **Agent Teams overlap.** Claude Code now has built-in [agent teams](https://docs.anthropic.com/en/docs/claude-code) with native team creation, shared task lists, and inter-agent messaging. For most parallel execution and coordination use cases, agent teams replace `swarm`. The `parallel_generation` and `role_based_review` commands still offer value for structured multi-perspective deliberation, since agent teams don't have opinionated review workflows built in.
+
+### council
+Council of LLMs - orchestrate multiple AI models (Claude + Codex) for higher quality code generation.
+
+Commands:
+- `/council:council_parallel` - Run Claude and Codex in parallel with confidence voting
+- `/council:council_review` - One model generates, the other reviews with debate
+- `/council:council_simple_review` - Quick code review by Codex
+
+> [!NOTE]
+> **Largely superseded by agent teams.** The council plugin was built before Claude Code had native multi-agent support. Agent teams now provide the same parallel-generation-and-compare pattern with better coordination primitives (task lists, messaging, file ownership). Council may still be useful if you specifically want **cross-model diversity** (Claude + Codex), but for Claude-only workflows, agent teams or `parallel_claudes` are more capable.
+>
+> Council also requires Codex CLI to be installed separately.
+
+---
+
+## Choosing a Plugin
+
+| If you want... | Use |
+|----------------|-----|
+| Get oriented in a new codebase | **orient** |
+| Hand off work between sessions | **pass_off** |
+| Role-based expert reviews (security, perf, etc.) | **parallel_claudes** (`role_based_review`) |
+| Structured multi-Claude deliberation | **parallel_claudes** (`parallel_generation`) |
+| Parallel task execution (legacy) | **parallel_claudes** (`swarm`) — consider agent teams instead |
+| Cross-model diversity (Claude + Codex) | **council** — consider agent teams instead |
+
+## Design Philosophy
+
+Most commands follow a **deliberation → implementation** pattern:
+
+1. Multiple instances discuss, compare approaches, and reach consensus
+2. You review the proposed solution and reasoning
+3. You decide whether to implement
+
+This keeps you in control — you see the "why" before any code changes.
+
+**Exception:** `swarm` executes immediately after you approve the task breakdown. Review the breakdown carefully, ensure git state is clean, and consider working on a branch.
