@@ -25,10 +25,15 @@ Commands:
 - `/orient:orient` - Run the full orientation workflow
 
 ### pass_off
-Create handoff documents that capture your current work state for session transitions. Gathers git status, recent changes, in-progress tasks, and generates a timestamped markdown file so the next session (or person) can pick up where you left off.
+Keep a plan and a handoff alive across compaction and sessions. A hook reloads the active plan and the latest handoff into context after every compaction and resume. The command writes a tactical handoff from the conversation and tests it with a reader that has no context.
+
+Install from the marketplace: `/plugin install pass_off@Ryan_plugins`
 
 Commands:
-- `/pass_off:pass_off` - Generate a handoff document
+- `/pass_off:pass_off` - Bring the plan current, write a handoff, and test both with a cold reader
+
+Hooks:
+- `SessionStart` - states the plan-keeping rules, and reloads the plan and handoff after `compact` and `resume`
 
 ---
 

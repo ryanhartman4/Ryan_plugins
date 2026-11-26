@@ -28,6 +28,17 @@
         "name": "Ryan Hartman",
         "email": "ryan@theryanhartman.com"
       }
+    },
+    {
+      "name": "pass_off",
+      "description": "Keep a plan and a handoff alive across compaction and sessions: a reload hook plus the /pass_off handoff command",
+      "source": "./plugins/pass_off",
+      "category": "productivity",
+      "version": "2.0.0",
+      "author": {
+        "name": "Ryan Hartman",
+        "email": "ryan@theryanhartman.com"
+      }
     }
   ]
 }

@@ -1,7 +1,7 @@
 {
   "name": "pass_off",
-  "description": "Create handoff documents to capture current work state for session transitions",
-  "version": "1.0.0",
+  "description": "Keep a plan and a handoff alive across compaction and sessions: a reload hook plus the /pass_off handoff command",
+  "version": "2.0.0",
   "author": {
     "name": "Ryan Hartman",
     "email": "ryan@theryanhartman.com"
