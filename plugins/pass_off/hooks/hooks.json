@@ -1,0 +1,28 @@
+{
+  "description": "Reload the active plan and the latest handoff after compaction or resume, and state the plan-keeping rules at every session start",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cat \"${CLAUDE_PLUGIN_ROOT}/rules/plans.md\""
+          }
+        ]
+      },
+      {
+        "matcher": "compact|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/reload-plan.sh\" plan"
+          },
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/reload-plan.sh\" handoff"
+          }
+        ]
+      }
+    ]
+  }
+}
